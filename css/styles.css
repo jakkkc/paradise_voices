@@ -69,6 +69,7 @@ button {
 }
 
 .app-header {
+  position: relative;
   background: var(--brown);
   color: var(--cream);
   display: flex;
@@ -76,6 +77,21 @@ button {
   justify-content: center;
   padding: 18px 16px;
   gap: 10px;
+}
+
+.install-btn {
+  display: none;
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: 1px solid var(--cream);
+  color: var(--cream);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .app-header img {

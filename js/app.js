@@ -442,3 +442,32 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("service-worker.js").catch(() => {});
   });
 }
+
+// ---------- Install prompt ----------
+
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById("install-btn");
+  if (btn) btn.style.display = "block";
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const installBtn = document.getElementById("install-btn");
+  if (!installBtn) return;
+
+  installBtn.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installBtn.style.display = "none";
+  });
+});
+
+window.addEventListener("appinstalled", () => {
+  const btn = document.getElementById("install-btn");
+  if (btn) btn.style.display = "none";
+});
