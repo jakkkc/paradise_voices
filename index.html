@@ -25,11 +25,59 @@
     </header>
 
     <main class="app-main">
-      <div class="card">
-        <h2>Step 2 — Connection Test</h2>
-        <p class="subtitle">This screen is temporary. It just confirms the app can talk to Supabase before we build the real screens.</p>
-        <div id="status" class="status-line">Checking connection…</div>
+
+      <!-- Step 1: PIN entry -->
+      <div id="view-pin" class="view card active">
+        <h2>Staff PIN</h2>
+        <p class="subtitle">Enter your 4-digit PIN</p>
+
+        <div class="pin-dots" id="pin-dots">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+
+        <div class="pin-keypad" id="pin-keypad">
+          <button class="pin-key" data-key="1">1</button>
+          <button class="pin-key" data-key="2">2</button>
+          <button class="pin-key" data-key="3">3</button>
+          <button class="pin-key" data-key="4">4</button>
+          <button class="pin-key" data-key="5">5</button>
+          <button class="pin-key" data-key="6">6</button>
+          <button class="pin-key" data-key="7">7</button>
+          <button class="pin-key" data-key="8">8</button>
+          <button class="pin-key" data-key="9">9</button>
+          <button class="pin-key pin-key-empty" tabindex="-1"></button>
+          <button class="pin-key" data-key="0">0</button>
+          <button class="pin-key pin-key-action" id="pin-backspace">&#9003;</button>
+        </div>
+
+        <div id="pin-error" class="status-line error" style="display:none;"></div>
       </div>
+
+      <!-- Step 1: Room selection (receptionist only) -->
+      <div id="view-room" class="view card">
+        <h2 id="room-branch-name">Branch</h2>
+        <p class="subtitle">Select the guest's room number</p>
+
+        <label for="room-select">Room</label>
+        <select id="room-select">
+          <option value="" disabled selected>Choose a room…</option>
+        </select>
+
+        <button class="btn btn-primary" id="room-continue-btn" disabled>Hand Tablet to Guest</button>
+        <button class="btn-link" id="room-back-btn">Not you? Re-enter PIN</button>
+      </div>
+
+      <!-- Temporary checkpoint screen — Step 4 replaces this with the real guest wizard -->
+      <div id="view-ready" class="view card">
+        <h2>Ready ✓</h2>
+        <p class="subtitle">Step 4 will build the actual guest feedback form here.</p>
+        <div class="room-summary">
+          <strong>Branch:</strong> <span id="ready-branch"></span><br>
+          <strong>Room:</strong> <span id="ready-room"></span>
+        </div>
+        <button class="btn-link" id="ready-back-btn">Start Over</button>
+      </div>
+
     </main>
   </div>
 

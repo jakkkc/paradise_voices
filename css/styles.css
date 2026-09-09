@@ -181,6 +181,98 @@ select:focus, input:focus, textarea:focus {
   border-color: var(--terracotta);
 }
 
+/* ---- Views (PIN / room / ready) ---- */
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
+
+/* ---- PIN pad ---- */
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 20px 0 28px;
+}
+
+.pin-dots .dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--terracotta);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.pin-dots .dot.filled {
+  background: var(--terracotta);
+}
+
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.pin-key {
+  padding: 18px 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--cream);
+  color: var(--brown);
+}
+
+.pin-key:active {
+  background: var(--terracotta);
+  color: var(--white);
+  border-color: var(--terracotta);
+}
+
+.pin-key-empty {
+  visibility: hidden;
+}
+
+.pin-key-action {
+  background: var(--brown);
+  color: var(--cream);
+  border: none;
+  font-size: 1.2rem;
+}
+
+.btn-link {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+  font-weight: 500;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.room-summary {
+  background: var(--cream);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+
+.room-summary strong {
+  color: var(--brown);
+}
+
 /* ---- Status / debug text (temporary, for Step 2 connection test) ---- */
 
 .status-line {
