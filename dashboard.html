@@ -55,15 +55,39 @@
         <div class="dashboard-header">
           <h2 style="margin:0;">Analytics</h2>
           <div style="display:flex; gap:10px; align-items:center;">
-            <select id="branch-filter">
-              <option value="all">All Branches</option>
-            </select>
             <button class="btn btn-secondary" id="staff-settings-btn" style="width:auto; padding:10px 18px;">Staff Settings</button>
             <button class="btn btn-primary" id="download-report-btn" style="width:auto; padding:10px 18px;">Download Report</button>
           </div>
         </div>
 
+        <div class="filter-bar">
+          <select id="branch-filter">
+            <option value="all">All Branches</option>
+          </select>
+          <select id="date-filter">
+            <option value="all">All Time</option>
+            <option value="7">Last 7 Days</option>
+            <option value="30">Last 30 Days</option>
+            <option value="month">This Month</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          <div id="custom-date-range" style="display:none;">
+            <input type="date" id="date-from" />
+            <input type="date" id="date-to" />
+          </div>
+        </div>
+
+        <h3 class="section-title">All-Time Overview</h3>
+        <div class="stat-grid stat-grid-compact" id="alltime-stat-grid"></div>
+
+        <h3 class="section-title" id="period-title">Selected Period</h3>
         <div class="stat-grid" id="stat-grid"></div>
+
+        <h3 class="section-title">Branch Comparison</h3>
+        <div class="chart-wrap"><canvas id="branch-comparison-chart"></canvas></div>
+
+        <h3 class="section-title">Room Category Performance</h3>
+        <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
 
         <h3 class="section-title">How Guests Heard About Us</h3>
         <div id="referral-breakdown"></div>
@@ -88,6 +112,7 @@
 
   <div id="print-report"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/dashboard.js"></script>

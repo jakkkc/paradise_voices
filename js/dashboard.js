@@ -1,6 +1,7 @@
 // ==========================================================
 // Paradise Voices — dashboard.js
-// Step 6a: PIN gate (management only) + live analytics.
+// Step 8a: date-range filter, all-time overview, branch
+// comparison chart, room category performance chart.
 // ==========================================================
 
 const mgmtState = {
@@ -9,7 +10,11 @@ const mgmtState = {
   feedback: [],
   branches: [],
   rooms: [],
+  roomCategories: [],
 };
+
+let branchChartInstance = null;
+let categoryChartInstance = null;
 
 const BRANCH_NAMES = {
   HPC: "Hunters Paradise Cottages",
@@ -24,6 +29,8 @@ const RATING_FIELDS = [
   { key: "value_rating", label: "Value for Money" },
   { key: "overall_rating", label: "Overall Stay" },
 ];
+
+const BRAND_COLORS = { hpc: "#B76542", hpt: "#432A17" };
 
 function showView(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
@@ -85,15 +92,18 @@ function setupMgmtPinPad() {
 // ---------- Data loading ----------
 
 async function loadDashboard() {
-  const [{ data: feedback, error: fbError }, { data: branches }, { data: rooms }] = await Promise.all([
-    db.rpc("get_management_feedback", { input_pin: mgmtState.pin }),
-    db.from("branches").select("id, code, name"),
-    db.from("rooms").select("id, room_number"),
-  ]);
+  const [{ data: feedback, error: fbError }, { data: branches }, { data: rooms }, { data: roomCategories }] =
+    await Promise.all([
+      db.rpc("get_management_feedback", { input_pin: mgmtState.pin }),
+      db.from("branches").select("id, code, name"),
+      db.from("rooms").select("id, room_number, category_id, branch_id"),
+      db.from("room_categories").select("id, name, branch_id"),
+    ]);
 
   mgmtState.feedback = fbError ? [] : feedback || [];
   mgmtState.branches = branches || [];
   mgmtState.rooms = rooms || [];
+  mgmtState.roomCategories = roomCategories || [];
 
   populateBranchFilter();
   renderDashboard();
@@ -108,6 +118,55 @@ function populateBranchFilter() {
     opt.textContent = BRANCH_NAMES[b.code] || b.name;
     select.appendChild(opt);
   });
+}
+
+// ---------- Filtering ----------
+
+function getDateBounds() {
+  const filter = document.getElementById("date-filter").value;
+  const now = new Date();
+  let from = null;
+  let to = null;
+
+  if (filter === "7") {
+    from = new Date(now);
+    from.setDate(from.getDate() - 7);
+  } else if (filter === "30") {
+    from = new Date(now);
+    from.setDate(from.getDate() - 30);
+  } else if (filter === "month") {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (filter === "custom") {
+    const fromVal = document.getElementById("date-from").value;
+    const toVal = document.getElementById("date-to").value;
+    from = fromVal ? new Date(fromVal + "T00:00:00") : null;
+    to = toVal ? new Date(toVal + "T23:59:59") : null;
+  }
+
+  return { from, to };
+}
+
+function branchFilteredRows() {
+  const filterValue = document.getElementById("branch-filter").value;
+  return filterValue === "all" ? mgmtState.feedback : mgmtState.feedback.filter((r) => r.branch_id === filterValue);
+}
+
+function applyDateBounds(rows) {
+  const { from, to } = getDateBounds();
+  return rows.filter((r) => {
+    const created = new Date(r.created_at);
+    if (from && created < from) return false;
+    if (to && created > to) return false;
+    return true;
+  });
+}
+
+function periodFilteredRows() {
+  return applyDateBounds(branchFilteredRows());
+}
+
+function dateOnlyFilteredRows() {
+  return applyDateBounds(mgmtState.feedback);
 }
 
 // ---------- Stats ----------
@@ -143,16 +202,37 @@ function computeReferralBreakdown(rows) {
   }));
 }
 
-// ---------- Render ----------
+// ---------- Render: overview + stat grid ----------
 
 function renderDashboard() {
-  const filterValue = document.getElementById("branch-filter").value;
-  const rows =
-    filterValue === "all" ? mgmtState.feedback : mgmtState.feedback.filter((r) => r.branch_id === filterValue);
+  const allTime = branchFilteredRows();
+  const period = periodFilteredRows();
 
-  renderStatGrid(rows);
-  renderReferralBreakdown(rows);
-  renderComments(rows);
+  renderAllTimeOverview(allTime);
+  renderStatGrid(period);
+  renderReferralBreakdown(period);
+  renderComments(period);
+  renderBranchComparisonChart();
+  renderCategoryChart(period);
+}
+
+function renderAllTimeOverview(rows) {
+  const grid = document.getElementById("alltime-stat-grid");
+  grid.innerHTML = "";
+
+  const nps = computeNps(rows);
+  const cards = [
+    { label: "Total Responses (All Time)", value: rows.length },
+    { label: "All-Time NPS", value: nps === null ? "–" : nps },
+    { label: "All-Time Overall Rating", value: formatAvg(average(rows, "overall_rating")) },
+  ];
+
+  cards.forEach((c) => {
+    const card = document.createElement("div");
+    card.className = "stat-card";
+    card.innerHTML = `<div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div>`;
+    grid.appendChild(card);
+  });
 }
 
 function renderStatGrid(rows) {
@@ -160,7 +240,7 @@ function renderStatGrid(rows) {
   grid.innerHTML = "";
 
   const cards = [
-    { label: "Total Responses", value: rows.length },
+    { label: "Responses (Period)", value: rows.length },
     { label: "NPS Score", value: computeNps(rows) === null ? "–" : computeNps(rows) },
   ];
 
@@ -181,7 +261,7 @@ function renderReferralBreakdown(rows) {
   container.innerHTML = "";
 
   if (rows.length === 0) {
-    container.innerHTML = '<p class="empty-note">No responses yet.</p>';
+    container.innerHTML = '<p class="empty-note">No responses in this period.</p>';
     return;
   }
 
@@ -207,7 +287,7 @@ function renderComments(rows) {
     .slice(0, 15);
 
   if (withComments.length === 0) {
-    container.innerHTML = '<p class="empty-note">No comments yet.</p>';
+    container.innerHTML = '<p class="empty-note">No comments in this period.</p>';
     return;
   }
 
@@ -234,6 +314,84 @@ function renderComments(rows) {
       <div>${r.comment.replace(/</g, "&lt;")}</div>
     `;
     container.appendChild(card);
+  });
+}
+
+// ---------- Charts ----------
+
+function renderBranchComparisonChart() {
+  const rows = dateOnlyFilteredRows();
+  const hpc = mgmtState.branches.find((b) => b.code === "HPC");
+  const hpt = mgmtState.branches.find((b) => b.code === "HPT");
+  const hpcRows = hpc ? rows.filter((r) => r.branch_id === hpc.id) : [];
+  const hptRows = hpt ? rows.filter((r) => r.branch_id === hpt.id) : [];
+
+  const labels = RATING_FIELDS.map((f) => f.label);
+  const hpcData = RATING_FIELDS.map((f) => average(hpcRows, f.key) || 0);
+  const hptData = RATING_FIELDS.map((f) => average(hptRows, f.key) || 0);
+
+  if (branchChartInstance) branchChartInstance.destroy();
+
+  const ctx = document.getElementById("branch-comparison-chart").getContext("2d");
+  branchChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: `HPC (${hpcRows.length})`, data: hpcData, backgroundColor: BRAND_COLORS.hpc, borderRadius: 4 },
+        { label: `HPT (${hptRows.length})`, data: hptData, backgroundColor: BRAND_COLORS.hpt, borderRadius: 4 },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true, max: 5 } },
+      plugins: { legend: { position: "bottom" } },
+    },
+  });
+}
+
+function compositeScore(row) {
+  const vals = RATING_FIELDS.map((f) => row[f.key]).filter((v) => v !== null && v !== undefined);
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function renderCategoryChart(rows) {
+  const roomCatMap = {};
+  mgmtState.rooms.forEach((r) => (roomCatMap[r.id] = r.category_id));
+
+  const catNameMap = {};
+  mgmtState.roomCategories.forEach((c) => (catNameMap[c.id] = c.name));
+
+  const byCategory = {};
+  rows.forEach((r) => {
+    const catId = roomCatMap[r.room_id];
+    const catName = catNameMap[catId] || "Unknown";
+    if (!byCategory[catName]) byCategory[catName] = [];
+    byCategory[catName].push(r);
+  });
+
+  const names = Object.keys(byCategory);
+  const labels = names.map((n) => `${n} (${byCategory[n].length})`);
+  const data = names.map((n) => {
+    const scores = byCategory[n].map(compositeScore).filter((v) => v !== null);
+    return scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  });
+
+  if (categoryChartInstance) categoryChartInstance.destroy();
+
+  const ctx = document.getElementById("category-chart").getContext("2d");
+  categoryChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{ label: "Avg Score", data, backgroundColor: BRAND_COLORS.hpc, borderRadius: 4 }],
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true, max: 5 } },
+      plugins: { legend: { display: false } },
+    },
   });
 }
 
@@ -323,7 +481,6 @@ function renderStaffList(staffRows) {
       statusEl.className = "status-line save-status ok";
       statusEl.style.display = "block";
 
-      // If management changed their own PIN, keep our session in sync
       if (cfg.role_key === "management" && newPin) {
         mgmtState.pin = newPin;
       }
@@ -347,18 +504,16 @@ async function openStaffView() {
 
 // ---------- Downloadable report ----------
 
-function currentFilteredRows() {
-  const filterValue = document.getElementById("branch-filter").value;
-  return filterValue === "all" ? mgmtState.feedback : mgmtState.feedback.filter((r) => r.branch_id === filterValue);
-}
-
 function currentFilterLabel() {
-  const select = document.getElementById("branch-filter");
-  return select.options[select.selectedIndex].textContent;
+  const branchSelect = document.getElementById("branch-filter");
+  const branchLabel = branchSelect.options[branchSelect.selectedIndex].textContent;
+  const dateSelect = document.getElementById("date-filter");
+  const dateLabel = dateSelect.options[dateSelect.selectedIndex].textContent;
+  return `${branchLabel} • ${dateLabel}`;
 }
 
 function generateAndPrintReport() {
-  const rows = currentFilteredRows();
+  const rows = periodFilteredRows();
   const label = currentFilterLabel();
   const generatedAt = new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -449,6 +604,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupMgmtPinPad();
 
   document.getElementById("branch-filter").addEventListener("change", renderDashboard);
+
+  document.getElementById("date-filter").addEventListener("change", (e) => {
+    document.getElementById("custom-date-range").style.display = e.target.value === "custom" ? "flex" : "none";
+    renderDashboard();
+  });
+  document.getElementById("date-from").addEventListener("change", renderDashboard);
+  document.getElementById("date-to").addEventListener("change", renderDashboard);
+
   document.getElementById("dashboard-logout-btn").addEventListener("click", () => {
     mgmtState.pin = null;
     showView("view-mgmt-pin");

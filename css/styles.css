@@ -492,7 +492,45 @@ input[type="range"] {
   margin-top: 4px;
 }
 
-.referral-bar-row {
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.filter-bar select {
+  width: auto;
+  margin-bottom: 0;
+}
+
+#custom-date-range {
+  display: flex;
+  gap: 8px;
+}
+
+#custom-date-range input[type="date"] {
+  width: auto;
+  margin-bottom: 0;
+  padding: 10px 12px;
+}
+
+.chart-wrap {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 10px;
+}
+
+.stat-grid-compact .stat-card {
+  padding: 12px;
+}
+
+.stat-grid-compact .stat-value {
+  font-size: 1.4rem;
+}
   display: flex;
   align-items: center;
   gap: 10px;
@@ -673,6 +711,23 @@ input[type="range"] {
 
   .comment-meta {
     line-height: 1.4;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-bar select {
+    width: 100% !important;
+  }
+
+  #custom-date-range {
+    flex-direction: column;
+  }
+
+  #custom-date-range input {
+    width: 100% !important;
   }
 }
 
