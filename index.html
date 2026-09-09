@@ -67,18 +67,96 @@
         <button class="btn-link" id="room-back-btn">Not you? Re-enter PIN</button>
       </div>
 
-      <!-- Temporary checkpoint screen — Step 4 replaces this with the real guest wizard -->
-      <div id="view-ready" class="view card">
-        <h2>Ready ✓</h2>
-        <p class="subtitle">Step 4 will build the actual guest feedback form here.</p>
+      <!-- Welcome / handoff screen -->
+      <div id="view-welcome" class="view card">
+        <h2>How Was Your Stay?</h2>
+        <p class="subtitle">We'd love to hear about your experience.</p>
         <div class="room-summary">
-          <strong>Branch:</strong> <span id="ready-branch"></span><br>
-          <strong>Room:</strong> <span id="ready-room"></span>
+          <strong>Branch:</strong> <span id="welcome-branch"></span><br>
+          <strong>Room:</strong> <span id="welcome-room"></span>
         </div>
-        <button class="btn-link" id="ready-back-btn">Start Over</button>
+        <button class="btn btn-primary" id="welcome-start-btn">Start Feedback</button>
+        <button class="btn-link" id="welcome-back-btn">Not this room? Go back</button>
+      </div>
+
+      <!-- Guest Step 1 of 4: Ratings -->
+      <div id="view-ratings" class="view card">
+        <p class="wizard-progress">Step 1 of 4</p>
+        <h2>Rate Your Stay</h2>
+        <p class="subtitle">Tap the stars to rate each category.</p>
+        <div id="ratings-container"></div>
+        <div class="step-nav">
+          <button class="btn btn-primary" id="ratings-next-btn" disabled>Next</button>
+        </div>
+      </div>
+
+      <!-- Guest Step 2 of 4: Recommend & Discovery -->
+      <div id="view-recommend" class="view card">
+        <p class="wizard-progress">Step 2 of 4</p>
+        <h2>Recommend &amp; Discovery</h2>
+
+        <label>How likely are you to recommend us? <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <div class="nps-value" id="nps-value">–</div>
+        <input type="range" min="0" max="10" step="1" value="5" id="nps-slider" />
+        <div class="nps-labels"><span>Not at all likely</span><span>Extremely likely</span></div>
+
+        <label>How did you hear about us? <span class="required-mark">*</span></label>
+        <div class="chip-group" id="referral-chips">
+          <button type="button" class="chip" data-value="online">Online</button>
+          <button type="button" class="chip" data-value="referral">Referral</button>
+          <button type="button" class="chip" data-value="repeat_guest">Repeat Guest</button>
+          <button type="button" class="chip" data-value="other">Other</button>
+        </div>
+
+        <div class="step-nav">
+          <button class="btn btn-secondary" id="recommend-back-btn">Back</button>
+          <button class="btn btn-primary" id="recommend-next-btn" disabled>Next</button>
+        </div>
+      </div>
+
+      <!-- Guest Step 3 of 4: Who Made Your Stay Special -->
+      <div id="view-mentions" class="view card">
+        <p class="wizard-progress">Step 3 of 4</p>
+        <h2>Who Made Your Stay Special?</h2>
+        <p class="subtitle">Optional — select anyone who stood out.</p>
+        <div id="mentions-container"></div>
+        <div class="step-nav">
+          <button class="btn btn-secondary" id="mentions-back-btn">Back</button>
+          <button class="btn btn-primary" id="mentions-next-btn">Next</button>
+        </div>
+      </div>
+
+      <!-- Guest Step 4 of 4: Comments & Contact -->
+      <div id="view-comments" class="view card">
+        <p class="wizard-progress">Step 4 of 4</p>
+        <h2>Anything Else?</h2>
+
+        <label for="comment-input">What can we improve or keep doing? <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <textarea id="comment-input" rows="4" placeholder="Tell us more…"></textarea>
+
+        <label for="name-input">Name <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="text" id="name-input" placeholder="Your name" />
+
+        <label for="contact-input">Phone or Email <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="text" id="contact-input" placeholder="So we can follow up, if you'd like" />
+
+        <div id="submit-error" class="status-line error" style="display:none;"></div>
+
+        <div class="step-nav">
+          <button class="btn btn-secondary" id="comments-back-btn">Back</button>
+          <button class="btn btn-primary" id="submit-btn">Submit Feedback</button>
+        </div>
+      </div>
+
+      <!-- Thank you -->
+      <div id="view-thankyou" class="view card">
+        <h2>Thank You! 🙏</h2>
+        <p class="subtitle">Your feedback helps us make every stay better.</p>
+        <button class="btn btn-primary" id="thankyou-done-btn">Done</button>
       </div>
 
     </main>
+
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
