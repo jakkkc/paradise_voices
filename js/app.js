@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", testConnection);
 // that's expected until we deploy to Vercel).
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+    navigator.serviceWorker.register("service-worker.js").catch(() => {
       // No-op: expected to fail when opened via file://
     });
   });
