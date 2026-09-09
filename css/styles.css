@@ -624,6 +624,58 @@ input[type="range"] {
   }
 }
 
+/* ---- Dashboard responsive (phones / narrow tablets) ---- */
+
+@media (max-width: 640px) {
+  .dashboard-main {
+    padding-top: 16px;
+  }
+
+  .dashboard-wrap {
+    padding: 0 4px 30px;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dashboard-header > div {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 10px !important;
+  }
+
+  .dashboard-header select,
+  .dashboard-header button {
+    width: 100% !important;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .referral-bar-name {
+    width: 74px;
+    font-size: 0.8rem;
+  }
+
+  .comment-meta {
+    line-height: 1.4;
+  }
+}
+
 .status-line {
   text-align: center;
   font-size: 0.85rem;
