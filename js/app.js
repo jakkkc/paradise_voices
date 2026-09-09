@@ -288,6 +288,17 @@ async function loadMentions(branchId) {
 
 // ---------- Comments & Submit (guest step 4/4) ----------
 
+function generateUUID() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 async function submitFeedback() {
   const submitBtn = document.getElementById("submit-btn");
   const errorEl = document.getElementById("submit-error");
@@ -295,7 +306,10 @@ async function submitFeedback() {
   submitBtn.disabled = true;
   submitBtn.textContent = "Submitting…";
 
+  const feedbackId = generateUUID();
+
   const payload = {
+    id: feedbackId,
     branch_id: state.branchId,
     room_id: state.roomId,
     front_office_rating: state.ratings.front_office_rating,
@@ -311,7 +325,7 @@ async function submitFeedback() {
     guest_contact: document.getElementById("contact-input").value.trim() || null,
   };
 
-  const { data, error } = await db.from("feedback").insert(payload).select("id").single();
+  const { error } = await db.from("feedback").insert(payload);
 
   if (error) {
     errorEl.textContent = "Couldn't submit — check your connection and try again.";
@@ -323,7 +337,7 @@ async function submitFeedback() {
 
   if (state.selectedMentions.size > 0) {
     const rows = Array.from(state.selectedMentions).map((teamMemberId) => ({
-      feedback_id: data.id,
+      feedback_id: feedbackId,
       team_member_id: teamMemberId,
     }));
     await db.from("feedback_mentions").insert(rows);
