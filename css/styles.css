@@ -1,0 +1,199 @@
+/* ==========================================================
+   Paradise Voices — brand stylesheet
+   Colors pulled directly from the logo:
+     brown (deep)   #432A17
+     terracotta     #B76542
+   ========================================================== */
+
+:root {
+  --brown: #432A17;
+  --brown-soft: #5c3a22;
+  --terracotta: #B76542;
+  --terracotta-dark: #96502F;
+  --cream: #FBF6F1;
+  --white: #FFFFFF;
+  --text-dark: #2B1B0F;
+  --text-muted: #7A6A5C;
+  --border: #E7DCD2;
+  --success: #4F7A5B;
+  --danger: #B3423A;
+
+  --font-heading: "Fraunces", Georgia, serif;
+  --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --radius: 14px;
+  --shadow: 0 4px 20px rgba(67, 42, 23, 0.10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--white);
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--brown);
+  margin: 0 0 0.4em 0;
+}
+
+p {
+  margin: 0 0 1em 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+/* ---- App shell ---- */
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: var(--brown);
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 16px;
+  gap: 10px;
+}
+
+.app-header img {
+  height: 40px;
+  width: auto;
+}
+
+.app-header .brand-name {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  color: var(--cream);
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--white);
+}
+
+/* ---- Card ---- */
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 32px 28px;
+}
+
+.card h2 {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.card .subtitle {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+/* ---- Buttons ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.btn-primary {
+  background: var(--terracotta);
+  color: var(--white);
+}
+
+.btn-primary:hover {
+  background: var(--terracotta-dark);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  background: #D9C4B6;
+  cursor: not-allowed;
+}
+
+/* ---- Form elements ---- */
+
+label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--brown);
+}
+
+select, input[type="text"], input[type="tel"], input[type="email"], textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--text-dark);
+  background: var(--white);
+  margin-bottom: 18px;
+}
+
+select:focus, input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--terracotta);
+}
+
+/* ---- Status / debug text (temporary, for Step 2 connection test) ---- */
+
+.status-line {
+  text-align: center;
+  font-size: 0.85rem;
+  margin-top: 18px;
+  color: var(--text-muted);
+}
+
+.status-line.ok {
+  color: var(--success);
+}
+
+.status-line.error {
+  color: var(--danger);
+}
