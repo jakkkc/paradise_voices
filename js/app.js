@@ -78,6 +78,11 @@ async function handlePinComplete() {
   state.branchCode = match.branch_code;
 
   if (state.role === "management") {
+    try {
+      sessionStorage.setItem("pv_mgmt_pin", state.pinDigits);
+    } catch (e) {
+      // sessionStorage unavailable — dashboard will just prompt for the PIN instead
+    }
     window.location.href = "dashboard.html";
     return;
   }

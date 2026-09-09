@@ -416,7 +416,197 @@ input[type="range"] {
   accent-color: var(--terracotta);
 }
 
-/* ---- Status / debug text (temporary, for Step 2 connection test) ---- */
+/* ---- Dashboard (manager) layout ---- */
+
+.dashboard-main {
+  align-items: flex-start !important;
+  padding-top: 32px;
+}
+
+.dashboard-wrap {
+  width: 100%;
+  max-width: 960px;
+  padding: 0 8px 40px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.dashboard-header select {
+  width: auto;
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-family: var(--font-heading);
+  color: var(--brown);
+  margin: 32px 0 14px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+
+.stat-value {
+  font-family: var(--font-heading);
+  font-size: 1.9rem;
+  color: var(--brown);
+  font-weight: 600;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.referral-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.referral-bar-name {
+  width: 110px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.referral-bar-track {
+  flex: 1;
+  background: var(--cream);
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.referral-bar-fill {
+  background: var(--terracotta);
+  height: 100%;
+}
+
+.referral-bar-pct {
+  width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.comment-card {
+  background: var(--cream);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.comment-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.empty-note {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* ---- Downloadable report (print-only) ---- */
+
+#print-report {
+  display: none;
+  background: #ffffff;
+  color: #1a1208;
+  padding: 24px;
+}
+
+#print-report h1 {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  color: #2B1B0F;
+  margin: 0 0 4px;
+}
+
+#print-report .report-meta {
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 24px;
+}
+
+#print-report .report-section-title {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  margin: 20px 0 10px;
+  color: #2B1B0F;
+}
+
+#print-report table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+#print-report th, #print-report td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.9rem;
+}
+
+#print-report th {
+  background: #f5efe8;
+  font-weight: 600;
+}
+
+#print-report .report-comment {
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+  page-break-inside: avoid;
+}
+
+#print-report .report-comment-meta {
+  font-size: 0.78rem;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+@media print {
+  @page {
+    margin: 18mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #print-report, #print-report * {
+    visibility: visible;
+  }
+  #print-report {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #fff;
+  }
+}
 
 .status-line {
   text-align: center;

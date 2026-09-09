@@ -20,13 +20,76 @@
       <span class="brand-name">Paradise Voices — Management</span>
     </header>
 
-    <main class="app-main">
-      <div class="card">
-        <h2>Dashboard coming in Step 6</h2>
-        <p class="subtitle">This page will show analytics, PIN/staff management, and the exportable report. For now, this just confirms the management PIN correctly routes here.</p>
-        <a class="btn btn-primary" href="index.html" style="text-decoration:none; display:inline-flex;">Back to PIN screen</a>
+    <main class="app-main dashboard-main">
+
+      <!-- Management PIN gate -->
+      <div id="view-mgmt-pin" class="view card active">
+        <h2>Management PIN</h2>
+        <p class="subtitle">Enter the management PIN to continue</p>
+
+        <div class="pin-dots" id="mgmt-pin-dots">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+
+        <div class="pin-keypad" id="mgmt-pin-keypad">
+          <button class="pin-key" data-key="1">1</button>
+          <button class="pin-key" data-key="2">2</button>
+          <button class="pin-key" data-key="3">3</button>
+          <button class="pin-key" data-key="4">4</button>
+          <button class="pin-key" data-key="5">5</button>
+          <button class="pin-key" data-key="6">6</button>
+          <button class="pin-key" data-key="7">7</button>
+          <button class="pin-key" data-key="8">8</button>
+          <button class="pin-key" data-key="9">9</button>
+          <button class="pin-key pin-key-empty" tabindex="-1"></button>
+          <button class="pin-key" data-key="0">0</button>
+          <button class="pin-key pin-key-action" id="mgmt-pin-backspace">&#9003;</button>
+        </div>
+
+        <div id="mgmt-pin-error" class="status-line error" style="display:none;"></div>
+        <a class="btn-link" href="index.html">Back to staff app</a>
       </div>
+
+      <!-- Dashboard content -->
+      <div id="view-dashboard" class="view dashboard-wrap">
+        <div class="dashboard-header">
+          <h2 style="margin:0;">Analytics</h2>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select id="branch-filter">
+              <option value="all">All Branches</option>
+            </select>
+            <button class="btn btn-secondary" id="staff-settings-btn" style="width:auto; padding:10px 18px;">Staff Settings</button>
+            <button class="btn btn-primary" id="download-report-btn" style="width:auto; padding:10px 18px;">Download Report</button>
+          </div>
+        </div>
+
+        <div class="stat-grid" id="stat-grid"></div>
+
+        <h3 class="section-title">How Guests Heard About Us</h3>
+        <div id="referral-breakdown"></div>
+
+        <h3 class="section-title">Recent Comments</h3>
+        <div id="comments-list"></div>
+
+        <button class="btn-link" id="dashboard-logout-btn">Log out</button>
+      </div>
+
+      <!-- Staff Settings -->
+      <div id="view-staff" class="view dashboard-wrap">
+        <div class="dashboard-header">
+          <h2 style="margin:0;">Staff Settings</h2>
+        </div>
+        <div id="staff-list"></div>
+        <button class="btn-link" id="staff-back-btn">Back to Analytics</button>
+      </div>
+
     </main>
   </div>
+
+  <div id="print-report"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/dashboard.js"></script>
 </body>
 </html>
