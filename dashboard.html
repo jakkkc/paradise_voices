@@ -77,11 +77,17 @@
           </div>
         </div>
 
-        <h3 class="section-title">All-Time Overview</h3>
-        <div class="stat-grid stat-grid-compact" id="alltime-stat-grid"></div>
+        <h3 class="section-title" id="icon-stat-title">Selected Period</h3>
+        <div class="stat-grid icon-stat-grid" id="icon-stat-row"></div>
 
-        <h3 class="section-title" id="period-title">Selected Period</h3>
+        <h3 class="section-title">Category Ratings</h3>
         <div class="stat-grid" id="stat-grid"></div>
+
+        <div class="overview-card" id="alltime-panel"></div>
+
+        <h3 class="section-title" id="trend-title"></h3>
+        <div class="chart-wrap" id="trend-chart-canvas-wrap"><canvas id="trend-chart"></canvas></div>
+        <p id="trend-chart-empty" class="empty-note" style="display:none;">No data in this period yet.</p>
 
         <h3 class="section-title">Branch Comparison</h3>
         <div class="chart-wrap"><canvas id="branch-comparison-chart"></canvas></div>
@@ -92,8 +98,11 @@
         <h3 class="section-title">How Guests Heard About Us</h3>
         <div id="referral-breakdown"></div>
 
-        <h3 class="section-title">Recent Comments</h3>
-        <div id="comments-list"></div>
+        <h3 class="section-title good-title" id="good-comments-title"></h3>
+        <div id="good-comments-list"></div>
+
+        <h3 class="section-title bad-title" id="bad-comments-title"></h3>
+        <div id="bad-comments-list"></div>
 
         <button class="btn-link" id="dashboard-logout-btn">Log out</button>
       </div>

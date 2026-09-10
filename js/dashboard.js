@@ -1,7 +1,8 @@
 // ==========================================================
 // Paradise Voices — dashboard.js
-// Step 8a: date-range filter, all-time overview, branch
-// comparison chart, room category performance chart.
+// Step 8b: icons, all-time overview with branch/outlet
+// breakdown, rating trend chart, CSAT, and Good/Bad comment
+// grouping with "Served by" staff attribution.
 // ==========================================================
 
 const mgmtState = {
@@ -11,10 +12,13 @@ const mgmtState = {
   branches: [],
   rooms: [],
   roomCategories: [],
+  mentions: [],
+  teamMembers: [],
 };
 
 let branchChartInstance = null;
 let categoryChartInstance = null;
+let trendChartInstance = null;
 
 const BRANCH_NAMES = {
   HPC: "Hunters Paradise Cottages",
@@ -31,6 +35,15 @@ const RATING_FIELDS = [
 ];
 
 const BRAND_COLORS = { hpc: "#B76542", hpt: "#432A17" };
+
+const ICONS = {
+  chat: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4H12l-5 2 .9-3.6A8.4 8.4 0 1 1 21 11.5z"/></svg>',
+  star: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg>',
+  thumbsUp: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>',
+  smiley: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
+  users: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  trend: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="14 6 21 6 21 13"/></svg>',
+};
 
 function showView(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
@@ -92,18 +105,28 @@ function setupMgmtPinPad() {
 // ---------- Data loading ----------
 
 async function loadDashboard() {
-  const [{ data: feedback, error: fbError }, { data: branches }, { data: rooms }, { data: roomCategories }] =
-    await Promise.all([
-      db.rpc("get_management_feedback", { input_pin: mgmtState.pin }),
-      db.from("branches").select("id, code, name"),
-      db.from("rooms").select("id, room_number, category_id, branch_id"),
-      db.from("room_categories").select("id, name, branch_id"),
-    ]);
+  const [
+    { data: feedback, error: fbError },
+    { data: branches },
+    { data: rooms },
+    { data: roomCategories },
+    { data: mentions, error: mentionsError },
+    { data: teamMembers },
+  ] = await Promise.all([
+    db.rpc("get_management_feedback", { input_pin: mgmtState.pin }),
+    db.from("branches").select("id, code, name"),
+    db.from("rooms").select("id, room_number, category_id, branch_id"),
+    db.from("room_categories").select("id, name, branch_id"),
+    db.rpc("get_management_mentions", { input_pin: mgmtState.pin }),
+    db.from("team_members").select("id, name, department"),
+  ]);
 
   mgmtState.feedback = fbError ? [] : feedback || [];
   mgmtState.branches = branches || [];
   mgmtState.rooms = rooms || [];
   mgmtState.roomCategories = roomCategories || [];
+  mgmtState.mentions = mentionsError ? [] : mentions || [];
+  mgmtState.teamMembers = teamMembers || [];
 
   populateBranchFilter();
   renderDashboard();
@@ -181,12 +204,34 @@ function formatAvg(val) {
   return val === null ? "–" : val.toFixed(1);
 }
 
+function pooledRatingValues(rows) {
+  const vals = [];
+  rows.forEach((r) => RATING_FIELDS.forEach((f) => {
+    const v = r[f.key];
+    if (v !== null && v !== undefined) vals.push(v);
+  }));
+  return vals;
+}
+
+function pooledAverage(rows) {
+  const vals = pooledRatingValues(rows);
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function computeCsat(rows) {
+  const vals = pooledRatingValues(rows);
+  if (vals.length === 0) return null;
+  const satisfied = vals.filter((v) => v >= 4).length;
+  return { pct: Math.round((satisfied / vals.length) * 1000) / 10, count: vals.length };
+}
+
 function computeNps(rows) {
   const answered = rows.filter((r) => r.nps !== null && r.nps !== undefined);
   if (answered.length === 0) return null;
   const promoters = answered.filter((r) => r.nps >= 9).length;
   const detractors = answered.filter((r) => r.nps <= 6).length;
-  return Math.round(((promoters - detractors) / answered.length) * 100);
+  return { score: Math.round(((promoters - detractors) / answered.length) * 100), count: answered.length };
 }
 
 function computeReferralBreakdown(rows) {
@@ -202,58 +247,124 @@ function computeReferralBreakdown(rows) {
   }));
 }
 
-// ---------- Render: overview + stat grid ----------
+// ---------- Render: main flow ----------
 
 function renderDashboard() {
   const allTime = branchFilteredRows();
   const period = periodFilteredRows();
 
-  renderAllTimeOverview(allTime);
+  renderIconStatRow(period);
   renderStatGrid(period);
+  renderAllTimeOverview(allTime);
+  renderTrendChart(period);
   renderReferralBreakdown(period);
-  renderComments(period);
   renderBranchComparisonChart();
   renderCategoryChart(period);
+  renderCommentGroups(period);
 }
 
-function renderAllTimeOverview(rows) {
-  const grid = document.getElementById("alltime-stat-grid");
-  grid.innerHTML = "";
-
+function renderIconStatRow(rows) {
+  const container = document.getElementById("icon-stat-row");
   const nps = computeNps(rows);
+  const csat = computeCsat(rows);
+  const repeatCount = rows.filter((r) => r.referral_source === "repeat_guest").length;
+  const overallAvg = pooledAverage(rows);
+
   const cards = [
-    { label: "Total Responses (All Time)", value: rows.length },
-    { label: "All-Time NPS", value: nps === null ? "–" : nps },
-    { label: "All-Time Overall Rating", value: formatAvg(average(rows, "overall_rating")) },
+    { icon: ICONS.chat, value: rows.length, label: "Total Feedback" },
+    { icon: ICONS.star, value: formatAvg(overallAvg), label: "Overall Avg" },
+    { icon: ICONS.thumbsUp, value: nps ? nps.score : "–", label: `NPS (${nps ? nps.count : 0} resp.)` },
+    { icon: ICONS.smiley, value: csat ? csat.pct + "%" : "–", label: `CSAT (${csat ? csat.count : 0} ratings)` },
+    { icon: ICONS.users, value: repeatCount, label: "Repeat Guests" },
   ];
 
-  cards.forEach((c) => {
-    const card = document.createElement("div");
-    card.className = "stat-card";
-    card.innerHTML = `<div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div>`;
-    grid.appendChild(card);
-  });
+  container.innerHTML = cards
+    .map(
+      (c) => `
+      <div class="icon-stat-card">
+        ${c.icon}
+        <div class="icon-stat-value">${c.value}</div>
+        <div class="icon-stat-label">${c.label}</div>
+      </div>
+    `
+    )
+    .join("");
 }
 
 function renderStatGrid(rows) {
   const grid = document.getElementById("stat-grid");
   grid.innerHTML = "";
 
-  const cards = [
-    { label: "Responses (Period)", value: rows.length },
-    { label: "NPS Score", value: computeNps(rows) === null ? "–" : computeNps(rows) },
-  ];
-
   RATING_FIELDS.forEach((f) => {
-    cards.push({ label: f.label, value: formatAvg(average(rows, f.key)) });
-  });
-
-  cards.forEach((c) => {
     const card = document.createElement("div");
     card.className = "stat-card";
-    card.innerHTML = `<div class="stat-value">${c.value}</div><div class="stat-label">${c.label}</div>`;
+    card.innerHTML = `<div class="stat-value">${formatAvg(average(rows, f.key))}</div><div class="stat-label">${f.label}</div>`;
     grid.appendChild(card);
   });
+}
+
+function roomCategoryMaps() {
+  const roomCatMap = {};
+  mgmtState.rooms.forEach((r) => (roomCatMap[r.id] = r.category_id));
+  const catNameMap = {};
+  mgmtState.roomCategories.forEach((c) => (catNameMap[c.id] = c.name));
+  return { roomCatMap, catNameMap };
+}
+
+function renderAllTimeOverview(rows) {
+  const panel = document.getElementById("alltime-panel");
+  const overallAvg = pooledAverage(rows);
+
+  const byBranch = {};
+  rows.forEach((r) => {
+    if (!byBranch[r.branch_id]) byBranch[r.branch_id] = [];
+    byBranch[r.branch_id].push(r);
+  });
+
+  const branchRowsHtml = mgmtState.branches
+    .map((b) => {
+      const branchRows = byBranch[b.id] || [];
+      if (branchRows.length === 0) return "";
+      const avg = pooledAverage(branchRows);
+      return `<div class="overview-row"><span>${BRANCH_NAMES[b.code] || b.name}</span><span>${formatAvg(avg)} <span class="count">(${branchRows.length})</span></span></div>`;
+    })
+    .join("");
+
+  const { roomCatMap, catNameMap } = roomCategoryMaps();
+  const byCat = {};
+  rows.forEach((r) => {
+    const catId = roomCatMap[r.room_id];
+    const catName = catNameMap[catId] || "Unknown";
+    if (!byCat[catName]) byCat[catName] = [];
+    byCat[catName].push(r);
+  });
+
+  const catRowsHtml = Object.keys(byCat)
+    .map((name) => {
+      const catRows = byCat[name];
+      const avg = pooledAverage(catRows);
+      return `<div class="overview-row"><span>${name}</span><span>${formatAvg(avg)} <span class="count">(${catRows.length})</span></span></div>`;
+    })
+    .join("");
+
+  panel.innerHTML = `
+    <h3>All-Time Overall Experience</h3>
+    <p class="overview-desc">Combines all 6 rating categories, across every submission ever received. Not affected by the filters above.</p>
+    <div>
+      <span class="overview-big">${formatAvg(overallAvg)}</span>
+      <span class="overview-big-sub">/ 5 — ${rows.length} review${rows.length === 1 ? "" : "s"}</span>
+    </div>
+    <div class="overview-columns">
+      <div>
+        <div class="overview-col-title">By Branch</div>
+        ${branchRowsHtml || '<p class="overview-desc">No data yet.</p>'}
+      </div>
+      <div>
+        <div class="overview-col-title">By Room Category</div>
+        ${catRowsHtml || '<p class="overview-desc">No data yet.</p>'}
+      </div>
+    </div>
+  `;
 }
 
 function renderReferralBreakdown(rows) {
@@ -274,46 +385,6 @@ function renderReferralBreakdown(rows) {
       <div class="referral-bar-pct">${item.pct}%</div>
     `;
     container.appendChild(row);
-  });
-}
-
-function renderComments(rows) {
-  const container = document.getElementById("comments-list");
-  container.innerHTML = "";
-
-  const withComments = rows
-    .filter((r) => r.comment)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 15);
-
-  if (withComments.length === 0) {
-    container.innerHTML = '<p class="empty-note">No comments in this period.</p>';
-    return;
-  }
-
-  const roomMap = {};
-  mgmtState.rooms.forEach((r) => (roomMap[r.id] = r.room_number));
-
-  const branchMap = {};
-  mgmtState.branches.forEach((b) => (branchMap[b.id] = BRANCH_NAMES[b.code] || b.name));
-
-  withComments.forEach((r) => {
-    const date = new Date(r.created_at).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-    const room = roomMap[r.room_id] || "Unknown room";
-    const branch = branchMap[r.branch_id] || "";
-    const guest = r.guest_name || "Anonymous";
-
-    const card = document.createElement("div");
-    card.className = "comment-card";
-    card.innerHTML = `
-      <div class="comment-meta">${guest} • ${branch}, Room ${room} • ${date}</div>
-      <div>${r.comment.replace(/</g, "&lt;")}</div>
-    `;
-    container.appendChild(card);
   });
 }
 
@@ -357,11 +428,7 @@ function compositeScore(row) {
 }
 
 function renderCategoryChart(rows) {
-  const roomCatMap = {};
-  mgmtState.rooms.forEach((r) => (roomCatMap[r.id] = r.category_id));
-
-  const catNameMap = {};
-  mgmtState.roomCategories.forEach((c) => (catNameMap[c.id] = c.name));
+  const { roomCatMap, catNameMap } = roomCategoryMaps();
 
   const byCategory = {};
   rows.forEach((r) => {
@@ -393,6 +460,158 @@ function renderCategoryChart(rows) {
       plugins: { legend: { display: false } },
     },
   });
+}
+
+function renderTrendChart(rows) {
+  const byDay = {};
+  rows.forEach((r) => {
+    const day = new Date(r.created_at).toISOString().slice(0, 10);
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push(r);
+  });
+
+  const days = Object.keys(byDay).sort();
+  const titleHtml = `${ICONS.trend} Rating Trend`;
+  document.getElementById("trend-title").innerHTML = titleHtml;
+
+  if (trendChartInstance) trendChartInstance.destroy();
+
+  if (days.length === 0) {
+    document.getElementById("trend-chart-canvas-wrap").style.display = "none";
+    document.getElementById("trend-chart-empty").style.display = "block";
+    return;
+  }
+  document.getElementById("trend-chart-canvas-wrap").style.display = "block";
+  document.getElementById("trend-chart-empty").style.display = "none";
+
+  const labels = days.map((d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+  const data = days.map((d) => pooledAverage(byDay[d]) || 0);
+
+  const ctx = document.getElementById("trend-chart").getContext("2d");
+  trendChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Avg Rating",
+          data,
+          borderColor: BRAND_COLORS.hpc,
+          backgroundColor: BRAND_COLORS.hpc,
+          tension: 0.35,
+          pointRadius: 4,
+          pointBackgroundColor: BRAND_COLORS.hpc,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: { y: { min: 0, max: 5 } },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+// ---------- Good / Bad comment grouping ----------
+
+function getBadTriggers(row) {
+  const triggers = [];
+  RATING_FIELDS.forEach((f) => {
+    const val = row[f.key];
+    if (val !== null && val !== undefined && val <= 3) {
+      triggers.push({ key: f.key, label: f.label, value: val });
+    }
+  });
+  if (row.nps !== null && row.nps !== undefined && row.nps <= 6) {
+    triggers.push({ key: "nps", label: "NPS", value: row.nps });
+  }
+  return triggers;
+}
+
+function getMentionNames(feedbackId) {
+  const ids = mgmtState.mentions.filter((m) => m.feedback_id === feedbackId).map((m) => m.team_member_id);
+  return ids.map((id) => {
+    const t = mgmtState.teamMembers.find((tm) => tm.id === id);
+    return t ? t.name : null;
+  }).filter(Boolean);
+}
+
+function buildRatingsRowHtml(row, badKeys) {
+  const parts = [];
+  RATING_FIELDS.forEach((f) => {
+    const val = row[f.key];
+    if (val === null || val === undefined) return;
+    const cls = badKeys.has(f.key) ? "low" : "";
+    parts.push(`<span class="${cls}">${f.label} ${val}★</span>`);
+  });
+  if (row.nps !== null && row.nps !== undefined) {
+    const cls = badKeys.has("nps") ? "low" : "";
+    parts.push(`<span class="${cls}">NPS ${row.nps}</span>`);
+  }
+  return parts.join("");
+}
+
+function renderCommentCard(row, badKeys, type, roomMap, branchMap) {
+  const date = new Date(row.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const room = roomMap[row.room_id] || "Unknown room";
+  const branch = branchMap[row.branch_id] || "";
+  const servedBy = getMentionNames(row.id);
+
+  let metaLine = "";
+  if (servedBy.length > 0 && row.guest_name) {
+    metaLine = `Served by ${servedBy.join(", ")} — ${row.guest_name}`;
+  } else if (servedBy.length > 0) {
+    metaLine = `Served by ${servedBy.join(", ")}`;
+  } else if (row.guest_name) {
+    metaLine = row.guest_name;
+  }
+
+  return `
+    <div class="feedback-card ${type}">
+      <div class="feedback-card-header">
+        <span>${branch} · Room ${room}</span>
+        <span class="feedback-card-date">${date}</span>
+      </div>
+      <div class="feedback-ratings">${buildRatingsRowHtml(row, badKeys)}</div>
+      <div class="feedback-comment-text">${row.comment.replace(/</g, "&lt;")}</div>
+      ${metaLine ? `<div class="feedback-meta">${metaLine}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderCommentGroups(rows) {
+  const roomMap = {};
+  mgmtState.rooms.forEach((r) => (roomMap[r.id] = r.room_number));
+  const branchMap = {};
+  mgmtState.branches.forEach((b) => (branchMap[b.id] = BRANCH_NAMES[b.code] || b.name));
+
+  const withComments = rows.filter((r) => r.comment).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const good = [];
+  const bad = [];
+  withComments.forEach((r) => {
+    const triggers = getBadTriggers(r);
+    if (triggers.length === 0) good.push(r);
+    else bad.push({ row: r, triggers });
+  });
+
+  document.getElementById("good-comments-title").innerHTML = `✓ Best Feedback (${good.length})`;
+  document.getElementById("bad-comments-title").innerHTML = `⚠ Needs Attention (${bad.length})`;
+
+  const goodContainer = document.getElementById("good-comments-list");
+  goodContainer.innerHTML =
+    good.length === 0
+      ? '<p class="empty-note">No standout comments in this period.</p>'
+      : good.slice(0, 20).map((r) => renderCommentCard(r, new Set(), "good", roomMap, branchMap)).join("");
+
+  const badContainer = document.getElementById("bad-comments-list");
+  badContainer.innerHTML =
+    bad.length === 0
+      ? '<p class="empty-note">Nothing flagged in this period.</p>'
+      : bad
+          .slice(0, 20)
+          .map(({ row, triggers }) => renderCommentCard(row, new Set(triggers.map((t) => t.key)), "bad", roomMap, branchMap))
+          .join("");
 }
 
 // ---------- Staff Settings ----------
@@ -518,6 +737,7 @@ function generateAndPrintReport() {
   const generatedAt = new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
   const nps = computeNps(rows);
+  const csat = computeCsat(rows);
   const referral = computeReferralBreakdown(rows);
 
   const roomMap = {};
@@ -535,7 +755,8 @@ function generateAndPrintReport() {
     <table>
       <tr><th>Metric</th><th>Value</th></tr>
       <tr><td>Total Responses</td><td>${rows.length}</td></tr>
-      <tr><td>NPS Score</td><td>${nps === null ? "–" : nps}</td></tr>
+      <tr><td>NPS Score</td><td>${nps ? nps.score : "–"}</td></tr>
+      <tr><td>CSAT</td><td>${csat ? csat.pct + "%" : "–"}</td></tr>
       ${RATING_FIELDS.map((f) => `<tr><td>${f.label}</td><td>${formatAvg(average(rows, f.key))}</td></tr>`).join("")}
     </table>
 
