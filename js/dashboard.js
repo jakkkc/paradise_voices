@@ -574,30 +574,6 @@ function generateAndPrintReport() {
   window.print();
 }
 
-// ---------- Auto-login (PIN handed off from index.html) ----------
-
-async function tryAutoLogin() {
-  let storedPin;
-  try {
-    storedPin = sessionStorage.getItem("pv_mgmt_pin");
-    sessionStorage.removeItem("pv_mgmt_pin");
-  } catch (e) {
-    return false;
-  }
-
-  if (!storedPin) return false;
-
-  const { data, error } = await db.rpc("verify_pin", { input_pin: storedPin });
-  if (error || !data || data.length === 0 || data[0].role_key !== "management") {
-    return false;
-  }
-
-  mgmtState.pin = storedPin;
-  await loadDashboard();
-  showView("view-dashboard");
-  return true;
-}
-
 // ---------- Wiring ----------
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -620,6 +596,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("staff-back-btn").addEventListener("click", () => showView("view-dashboard"));
   document.getElementById("download-report-btn").addEventListener("click", generateAndPrintReport);
 
-  const loggedIn = await tryAutoLogin();
-  if (!loggedIn) showView("view-mgmt-pin");
+  // Decide the correct view BEFORE showing anything, so there's no
+  // flash of the PIN screen when arriving with a valid handed-off PIN.
+  let storedPin = null;
+  try {
+    storedPin = sessionStorage.getItem("pv_mgmt_pin");
+    sessionStorage.removeItem("pv_mgmt_pin");
+  } catch (e) {
+    storedPin = null;
+  }
+
+  if (storedPin) {
+    const { data, error } = await db.rpc("verify_pin", { input_pin: storedPin });
+    if (!error && data && data.length > 0 && data[0].role_key === "management") {
+      mgmtState.pin = storedPin;
+      await loadDashboard();
+      showView("view-dashboard");
+      return;
+    }
+  }
+
+  showView("view-mgmt-pin");
 });
