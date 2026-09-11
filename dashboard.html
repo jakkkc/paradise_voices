@@ -113,6 +113,22 @@
           <h2 style="margin:0;">Staff Settings</h2>
         </div>
         <div id="staff-list"></div>
+
+        <h3 class="section-title">Team Members</h3>
+        <p class="empty-note" style="margin-bottom:16px;">Shown to guests in "Who Made Your Stay Special." Changes apply to both branches.</p>
+        <div id="team-members-list"></div>
+
+        <div class="card" style="margin-bottom:16px; max-width:100%;">
+          <h3>Add Staff Member</h3>
+          <label for="new-member-dept-select">Department</label>
+          <select id="new-member-dept-select"></select>
+          <input type="text" id="new-member-dept-new" placeholder="New department name" style="display:none;" />
+          <label for="new-member-name-input">Name</label>
+          <input type="text" id="new-member-name-input" placeholder="Staff name" />
+          <div id="add-member-status" class="status-line" style="display:none;"></div>
+          <button class="btn btn-primary" id="add-member-btn">Add</button>
+        </div>
+
         <button class="btn-link" id="staff-back-btn">Back to Analytics</button>
       </div>
 

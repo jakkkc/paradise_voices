@@ -532,6 +532,71 @@ input[type="range"] {
   font-size: 1.4rem;
 }
 
+.team-member-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+
+.team-member-row:last-child {
+  border-bottom: none;
+}
+
+.team-member-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.team-member-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.team-member-edit-form {
+  padding-top: 10px;
+}
+
+.team-member-edit-form label {
+  font-size: 0.8rem;
+}
+
+.team-member-edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-edit-member {
+  background: none;
+  border: 1px solid var(--terracotta);
+  color: var(--terracotta);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.btn-edit-member:hover {
+  background: var(--terracotta);
+  color: var(--white);
+}
+
+.btn-remove-member {
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.btn-remove-member:hover {
+  background: var(--danger);
+  color: var(--white);
+}
+
 .referral-bar-row {
   display: flex;
   align-items: center;
@@ -737,13 +802,6 @@ input[type="range"] {
   text-align: right;
   flex-shrink: 0;
   color: var(--text-muted);
-}
-
-.comment-card {
-  background: var(--cream);
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
 }
 
 .comment-meta {

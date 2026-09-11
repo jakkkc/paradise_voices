@@ -718,7 +718,251 @@ function renderStaffList(staffRows) {
 async function openStaffView() {
   const rows = await loadStaffRoles();
   renderStaffList(rows);
+  await refreshTeamMembersUI();
   showView("view-staff");
+}
+
+// ---------- Team Members (Front Office / Housekeeping / etc) ----------
+
+async function fetchTeamMembers() {
+  const { data, error } = await db
+    .from("team_members")
+    .select("department, name")
+    .order("department")
+    .order("name");
+  return error ? [] : data || [];
+}
+
+function dedupeByDeptName(rows) {
+  const seen = new Set();
+  const result = [];
+  rows.forEach((r) => {
+    const key = r.department + "|" + r.name;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ department: r.department, name: r.name });
+    }
+  });
+  return result;
+}
+
+async function refreshTeamMembersUI() {
+  const rows = dedupeByDeptName(await fetchTeamMembers());
+  renderTeamMembersList(rows);
+  populateDeptDropdown(rows);
+}
+
+function renderTeamMembersList(members) {
+  const container = document.getElementById("team-members-list");
+
+  const byDept = {};
+  members.forEach((m) => {
+    if (!byDept[m.department]) byDept[m.department] = [];
+    byDept[m.department].push(m.name);
+  });
+
+  const deptNames = Object.keys(byDept);
+  container.innerHTML =
+    deptNames.length === 0
+      ? '<p class="empty-note">No team members yet.</p>'
+      : deptNames
+          .map(
+            (dept) => `
+        <div class="card" style="margin-bottom:16px; max-width:100%;">
+          <h3>${dept}</h3>
+          ${byDept[dept]
+            .map(
+              (name) => `
+            <div class="team-member-row">
+              <div class="team-member-display">
+                <span>${name}</span>
+                <div class="team-member-actions">
+                  <button class="btn-edit-member" data-dept="${dept}" data-name="${name}">Edit</button>
+                  <button class="btn-remove-member" data-dept="${dept}" data-name="${name}">Remove</button>
+                </div>
+              </div>
+              <div class="team-member-edit-form" style="display:none;">
+                <label>Name</label>
+                <input type="text" class="edit-name-input" value="${name}" />
+                <label>Department</label>
+                <select class="edit-dept-select"></select>
+                <input type="text" class="edit-dept-new-input" placeholder="New department name" style="display:none;" />
+                <div class="team-member-edit-actions">
+                  <button class="btn btn-primary btn-save-member" style="width:auto;">Save</button>
+                  <button class="btn-link btn-cancel-member" style="width:auto;">Cancel</button>
+                </div>
+              </div>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      `
+          )
+          .join("");
+
+  container.querySelectorAll(".btn-edit-member").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest(".team-member-row");
+      row.querySelector(".team-member-display").style.display = "none";
+      const form = row.querySelector(".team-member-edit-form");
+      form.style.display = "block";
+
+      const deptSelect = form.querySelector(".edit-dept-select");
+      deptSelect.innerHTML =
+        deptNames.map((d) => `<option value="${d}" ${d === btn.dataset.dept ? "selected" : ""}>${d}</option>`).join("") +
+        '<option value="__new__">+ New Department</option>';
+
+      const newDeptInput = form.querySelector(".edit-dept-new-input");
+      deptSelect.addEventListener("change", () => {
+        newDeptInput.style.display = deptSelect.value === "__new__" ? "block" : "none";
+      });
+    });
+  });
+
+  container.querySelectorAll(".btn-cancel-member").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest(".team-member-row");
+      row.querySelector(".team-member-edit-form").style.display = "none";
+      row.querySelector(".team-member-display").style.display = "flex";
+    });
+  });
+
+  container.querySelectorAll(".btn-save-member").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const row = btn.closest(".team-member-row");
+      const editBtn = row.querySelector(".btn-edit-member");
+      const oldDept = editBtn.dataset.dept;
+      const oldName = editBtn.dataset.name;
+      const form = row.querySelector(".team-member-edit-form");
+      const newName = form.querySelector(".edit-name-input").value.trim();
+      const deptSelect = form.querySelector(".edit-dept-select");
+      const newDept = deptSelect.value === "__new__" ? form.querySelector(".edit-dept-new-input").value.trim() : deptSelect.value;
+
+      if (!newName || !newDept) {
+        alert("Name and department cannot be empty.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Saving…";
+
+      const { error } = await db.rpc("update_team_member", {
+        input_mgmt_pin: mgmtState.pin,
+        input_department: oldDept,
+        input_name: oldName,
+        new_department: newDept,
+        new_name: newName,
+      });
+
+      btn.disabled = false;
+      btn.textContent = "Save";
+
+      if (error) {
+        alert("Couldn't save changes: " + error.message);
+        return;
+      }
+
+      await refreshTeamMembersUI();
+    });
+  });
+
+  container.querySelectorAll(".btn-remove-member").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const dept = btn.dataset.dept;
+      const name = btn.dataset.name;
+      if (!confirm(`Remove ${name} from ${dept}? This applies to both branches.`)) return;
+
+      btn.disabled = true;
+      btn.textContent = "Removing…";
+
+      const { error } = await db.rpc("remove_team_member", {
+        input_mgmt_pin: mgmtState.pin,
+        input_department: dept,
+        input_name: name,
+      });
+
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = "Remove";
+        alert("Couldn't remove: " + error.message);
+        return;
+      }
+
+      await refreshTeamMembersUI();
+    });
+  });
+}
+
+function populateDeptDropdown(members) {
+  const select = document.getElementById("new-member-dept-select");
+  const depts = [...new Set(members.map((m) => m.department))];
+
+  select.innerHTML =
+    depts.map((d) => `<option value="${d}">${d}</option>`).join("") +
+    '<option value="__new__">+ New Department</option>';
+
+  syncNewDeptInputVisibility();
+}
+
+function syncNewDeptInputVisibility() {
+  const deptSelect = document.getElementById("new-member-dept-select");
+  const newDeptInput = document.getElementById("new-member-dept-new");
+  const isNew = deptSelect.value === "__new__";
+  newDeptInput.style.display = isNew ? "block" : "none";
+  if (!isNew) newDeptInput.value = "";
+}
+
+function setupAddTeamMember() {
+  const deptSelect = document.getElementById("new-member-dept-select");
+  const newDeptInput = document.getElementById("new-member-dept-new");
+  const nameInput = document.getElementById("new-member-name-input");
+  const statusEl = document.getElementById("add-member-status");
+  const addBtn = document.getElementById("add-member-btn");
+
+  deptSelect.addEventListener("change", () => {
+    syncNewDeptInputVisibility();
+  });
+
+  addBtn.addEventListener("click", async () => {
+    const dept = deptSelect.value === "__new__" ? newDeptInput.value.trim() : deptSelect.value;
+    const name = nameInput.value.trim();
+
+    if (!dept || !name) {
+      statusEl.textContent = "Enter both a department and a name.";
+      statusEl.className = "status-line error";
+      statusEl.style.display = "block";
+      return;
+    }
+
+    addBtn.disabled = true;
+    addBtn.textContent = "Adding…";
+
+    const { error } = await db.rpc("add_team_member", {
+      input_mgmt_pin: mgmtState.pin,
+      input_department: dept,
+      input_name: name,
+    });
+
+    addBtn.disabled = false;
+    addBtn.textContent = "Add";
+
+    if (error) {
+      statusEl.textContent = "Couldn't add — try again.";
+      statusEl.className = "status-line error";
+      statusEl.style.display = "block";
+      return;
+    }
+
+    statusEl.textContent = "Added ✓";
+    statusEl.className = "status-line ok";
+    statusEl.style.display = "block";
+    nameInput.value = "";
+    newDeptInput.value = "";
+    newDeptInput.style.display = "none";
+
+    await refreshTeamMembersUI();
+  });
 }
 
 // ---------- Downloadable report ----------
@@ -799,6 +1043,7 @@ function generateAndPrintReport() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   setupMgmtPinPad();
+  setupAddTeamMember();
 
   document.getElementById("branch-filter").addEventListener("change", renderDashboard);
 
