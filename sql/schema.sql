@@ -182,15 +182,9 @@ select 'hpt_reception', id, 'HPT Reception', '2222' from branches where code = '
 union all
 select 'management', null, 'Management', '1234';
 
--- PLACEHOLDER team members. EDIT ME.
-insert into team_members (branch_id, department, name)
-select id, 'Front Desk', 'Front Desk Team' from branches where code = 'HPC'
-union all
-select id, 'Housekeeping', 'Housekeeping Team' from branches where code = 'HPC'
-union all
-select id, 'Front Desk', 'Front Desk Team' from branches where code = 'HPT'
-union all
-select id, 'Housekeeping', 'Housekeeping Team' from branches where code = 'HPT';
+-- Team members are NOT seeded here — management builds this list entirely
+-- from the dashboard's "Add Staff Member" screen (Staff Settings). A fresh
+-- database starts with an empty team_members table.
 
 -- ============================================================
 -- ROW LEVEL SECURITY
@@ -290,10 +284,98 @@ begin
 end;
 $$;
 
+-- Lets management read which team members were mentioned on each
+-- feedback row (for "Served by ..." on the dashboard).
+create or replace function get_management_mentions(input_pin text)
+returns table (feedback_id uuid, team_member_id uuid)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where role_key = 'management' and pin = input_pin) then
+    raise exception 'Invalid management PIN';
+  end if;
+
+  return query select fm.feedback_id, fm.team_member_id from feedback_mentions fm;
+end;
+$$;
+
+-- Adds a staff member to Front Office / Housekeeping / etc. — applied to
+-- both branches at once, since the same team serves both. Typing a brand
+-- new department name here creates that department (departments aren't
+-- a separate table — they're just whatever's in use).
+create or replace function add_team_member(input_mgmt_pin text, input_department text, input_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where role_key = 'management' and pin = input_mgmt_pin) then
+    raise exception 'Invalid management PIN';
+  end if;
+
+  insert into team_members (branch_id, department, name)
+  select id, input_department, input_name from branches where code in ('HPC', 'HPT');
+end;
+$$;
+
+-- Removes a staff member from both branches at once.
+create or replace function remove_team_member(input_mgmt_pin text, input_department text, input_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where role_key = 'management' and pin = input_mgmt_pin) then
+    raise exception 'Invalid management PIN';
+  end if;
+
+  delete from team_members
+  where department = input_department
+    and name = input_name
+    and branch_id in (select id from branches where code in ('HPC', 'HPT'));
+end;
+$$;
+
+-- Renames a staff member and/or moves them to a different department —
+-- applied to both branches at once.
+create or replace function update_team_member(
+  input_mgmt_pin text,
+  input_department text,
+  input_name text,
+  new_department text,
+  new_name text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where role_key = 'management' and pin = input_mgmt_pin) then
+    raise exception 'Invalid management PIN';
+  end if;
+
+  update team_members
+  set department = coalesce(new_department, department),
+      name = coalesce(new_name, name)
+  where department = input_department
+    and name = input_name
+    and branch_id in (select id from branches where code in ('HPC', 'HPT'));
+end;
+$$;
+
 grant execute on function verify_pin(text) to anon;
 grant execute on function get_management_feedback(text) to anon;
 grant execute on function update_staff_credentials(text, text, text, text) to anon;
 grant execute on function get_staff_roles(text) to anon;
+grant execute on function get_management_mentions(text) to anon;
+grant execute on function add_team_member(text, text, text) to anon;
+grant execute on function remove_team_member(text, text, text) to anon;
+grant execute on function update_team_member(text, text, text, text, text) to anon;
 
 -- ============================================================
 -- Done. Next: verify in Table Editor that branches/room_categories/
