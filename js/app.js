@@ -18,6 +18,14 @@ const BRANCH_NAMES = {
   HPT: "Hunters Paradise Tuuti",
 };
 
+// EDIT ME: paste your real Google review links here (Google Maps -> Share ->
+// "Ask for reviews" -> copy link). Leave a branch blank/empty to disable the
+// prompt for that branch.
+const GOOGLE_REVIEW_LINKS = {
+  HPC: "https://g.page/r/CRZGx1PtGtqoEBM/review",
+  HPT: "https://g.page/r/CVPEsVcvizLmEBM/review",
+};
+
 const state = {
   pinDigits: "",
   role: null,
@@ -304,6 +312,12 @@ function generateUUID() {
   });
 }
 
+function guestGaveOnlyGoodRatings() {
+  const vals = Object.values(state.ratings).filter((v) => v !== null && v !== undefined);
+  if (vals.length === 0) return false;
+  return vals.every((v) => v >= 4);
+}
+
 async function submitFeedback() {
   const submitBtn = document.getElementById("submit-btn");
   const errorEl = document.getElementById("submit-error");
@@ -350,7 +364,14 @@ async function submitFeedback() {
 
   submitBtn.disabled = false;
   submitBtn.textContent = "Submit Feedback";
-  showView("view-thankyou");
+
+  const reviewLink = GOOGLE_REVIEW_LINKS[state.branchCode];
+  if (reviewLink && guestGaveOnlyGoodRatings()) {
+    document.getElementById("google-review-btn").href = reviewLink;
+    showView("view-review-prompt");
+  } else {
+    showView("view-thankyou");
+  }
 }
 
 function resetCommentsView() {
@@ -424,6 +445,11 @@ function setupWizardNav() {
 
   document.getElementById("comments-back-btn").addEventListener("click", () => showView("view-mentions"));
   document.getElementById("submit-btn").addEventListener("click", submitFeedback);
+
+  document.getElementById("google-review-btn").addEventListener("click", () => {
+    setTimeout(() => showView("view-thankyou"), 300);
+  });
+  document.getElementById("review-skip-btn").addEventListener("click", () => showView("view-thankyou"));
 
   document.getElementById("thankyou-done-btn").addEventListener("click", fullReset);
 }
