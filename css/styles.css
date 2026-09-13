@@ -604,6 +604,51 @@ input[type="range"] {
   color: var(--white);
 }
 
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+  flex-wrap: wrap;
+}
+
+.leaderboard-row:last-child {
+  border-bottom: none;
+}
+
+.leaderboard-rank {
+  width: 28px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--terracotta);
+}
+
+.leaderboard-name {
+  flex: 1;
+  min-width: 120px;
+  font-weight: 600;
+  color: var(--brown);
+}
+
+.leaderboard-dept {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.leaderboard-mentions {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.leaderboard-score {
+  color: var(--terracotta);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 .referral-bar-row {
   display: flex;
   align-items: center;

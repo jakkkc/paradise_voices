@@ -265,6 +265,7 @@ function renderDashboard() {
   renderReferralBreakdown(period);
   renderBranchComparisonChart();
   renderCategoryChart(period);
+  renderLeaderboard(period);
   renderCommentGroups(period);
 }
 
@@ -667,6 +668,65 @@ function renderDetractorList(rows) {
         </div>
       `;
     })
+    .join("");
+}
+
+// ---------- Staff Leaderboard ----------
+
+function computeLeaderboard(rows) {
+  const feedbackIds = new Set(rows.map((r) => r.id));
+  const mentionsInPeriod = mgmtState.mentions.filter((m) => feedbackIds.has(m.feedback_id));
+
+  const rowById = {};
+  rows.forEach((r) => (rowById[r.id] = r));
+
+  const byMember = {};
+  mentionsInPeriod.forEach((m) => {
+    if (!byMember[m.team_member_id]) byMember[m.team_member_id] = [];
+    byMember[m.team_member_id].push(m.feedback_id);
+  });
+
+  const list = Object.keys(byMember).map((memberId) => {
+    const member = mgmtState.teamMembers.find((t) => t.id === memberId);
+    const fids = byMember[memberId];
+    const scores = fids.map((fid) => compositeScore(rowById[fid])).filter((v) => v !== null);
+    const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+    return {
+      name: member ? member.name : "Unknown",
+      department: member ? member.department : "",
+      mentions: fids.length,
+      avgScore: avg,
+    };
+  });
+
+  list.sort((a, b) => b.mentions - a.mentions);
+  return list;
+}
+
+function renderLeaderboard(rows) {
+  document.getElementById("leaderboard-title").innerHTML = `${ICONS.users} Staff Leaderboard`;
+
+  const container = document.getElementById("leaderboard-list");
+  const list = computeLeaderboard(rows);
+
+  if (list.length === 0) {
+    container.innerHTML = '<p class="empty-note">No staff mentions in this period.</p>';
+    return;
+  }
+
+  const medals = ["🥇", "🥈", "🥉"];
+  container.innerHTML = list
+    .slice(0, 10)
+    .map(
+      (entry, idx) => `
+      <div class="leaderboard-row">
+        <span class="leaderboard-rank">${medals[idx] || idx + 1}</span>
+        <span class="leaderboard-name">${entry.name} <span class="leaderboard-dept">(${entry.department})</span></span>
+        <span class="leaderboard-mentions">${entry.mentions} mention${entry.mentions === 1 ? "" : "s"}</span>
+        <span class="leaderboard-score">${entry.avgScore !== null ? entry.avgScore.toFixed(1) + "★ avg" : ""}</span>
+      </div>
+    `
+    )
     .join("");
 }
 
