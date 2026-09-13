@@ -524,6 +524,13 @@ input[type="range"] {
   margin-bottom: 10px;
 }
 
+.nps-breakdown-canvas-container {
+  position: relative;
+  height: 200px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
 .stat-grid-compact .stat-card {
   padding: 12px;
 }
@@ -961,6 +968,10 @@ input[type="range"] {
 
   #custom-date-range input {
     width: 100% !important;
+  }
+
+  .nps-breakdown-canvas-container {
+    height: 170px;
   }
 
   .icon-stat-grid {

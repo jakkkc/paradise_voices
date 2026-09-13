@@ -19,6 +19,8 @@ const mgmtState = {
 let branchChartInstance = null;
 let categoryChartInstance = null;
 let trendChartInstance = null;
+let npsBreakdownChartInstance = null;
+let npsTrendChartInstance = null;
 
 const BRANCH_NAMES = {
   HPC: "Hunters Paradise Cottages",
@@ -83,6 +85,7 @@ async function handleMgmtPinComplete() {
 
   await loadDashboard();
   showView("view-dashboard");
+  renderDashboard();
 }
 
 function setupMgmtPinPad() {
@@ -129,7 +132,6 @@ async function loadDashboard() {
   mgmtState.teamMembers = teamMembers || [];
 
   populateBranchFilter();
-  renderDashboard();
 }
 
 function populateBranchFilter() {
@@ -257,6 +259,9 @@ function renderDashboard() {
   renderStatGrid(period);
   renderAllTimeOverview(allTime);
   renderTrendChart(period);
+  renderNpsBreakdownChart(period);
+  renderNpsTrendChart(period);
+  renderDetractorList(period);
   renderReferralBreakdown(period);
   renderBranchComparisonChart();
   renderCategoryChart(period);
@@ -510,6 +515,159 @@ function renderTrendChart(rows) {
       plugins: { legend: { display: false } },
     },
   });
+}
+
+// ---------- NPS deep-dive ----------
+
+function classifyNps(rows) {
+  const answered = rows.filter((r) => r.nps !== null && r.nps !== undefined);
+  const promoters = answered.filter((r) => r.nps >= 9);
+  const passives = answered.filter((r) => r.nps >= 7 && r.nps <= 8);
+  const detractors = answered.filter((r) => r.nps <= 6);
+  return { answered, promoters, passives, detractors };
+}
+
+function renderNpsBreakdownChart(rows) {
+  document.getElementById("nps-breakdown-title").innerHTML = `${ICONS.thumbsUp} NPS Breakdown`;
+
+  const { answered, promoters, passives, detractors } = classifyNps(rows);
+
+  if (npsBreakdownChartInstance) npsBreakdownChartInstance.destroy();
+
+  const wrap = document.getElementById("nps-breakdown-wrap");
+  const emptyEl = document.getElementById("nps-breakdown-empty");
+
+  if (answered.length === 0) {
+    wrap.style.display = "none";
+    emptyEl.style.display = "block";
+    return;
+  }
+  wrap.style.display = "block";
+  emptyEl.style.display = "none";
+
+  const ctx = document.getElementById("nps-breakdown-chart").getContext("2d");
+  npsBreakdownChartInstance = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: [`Promoters (${promoters.length})`, `Passives (${passives.length})`, `Detractors (${detractors.length})`],
+      datasets: [
+        {
+          data: [promoters.length, passives.length, detractors.length],
+          backgroundColor: ["#4F7A5B", "#D9A44E", "#B3423A"],
+          borderWidth: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "right" } },
+    },
+  });
+}
+
+function renderNpsTrendChart(rows) {
+  document.getElementById("nps-trend-title").innerHTML = `${ICONS.trend} NPS Trend`;
+
+  const answered = rows.filter((r) => r.nps !== null && r.nps !== undefined);
+  const byDay = {};
+  answered.forEach((r) => {
+    const day = new Date(r.created_at).toISOString().slice(0, 10);
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push(r.nps);
+  });
+
+  const days = Object.keys(byDay).sort();
+
+  if (npsTrendChartInstance) npsTrendChartInstance.destroy();
+
+  const wrap = document.getElementById("nps-trend-canvas-wrap");
+  const emptyEl = document.getElementById("nps-trend-empty");
+
+  if (days.length === 0) {
+    wrap.style.display = "none";
+    emptyEl.style.display = "block";
+    return;
+  }
+  wrap.style.display = "block";
+  emptyEl.style.display = "none";
+
+  const labels = days.map((d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+  const data = days.map((d) => {
+    const vals = byDay[d];
+    const promoters = vals.filter((v) => v >= 9).length;
+    const detractors = vals.filter((v) => v <= 6).length;
+    return Math.round(((promoters - detractors) / vals.length) * 100);
+  });
+
+  const ctx = document.getElementById("nps-trend-chart").getContext("2d");
+  npsTrendChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "NPS",
+          data,
+          borderColor: BRAND_COLORS.hpt,
+          backgroundColor: BRAND_COLORS.hpt,
+          tension: 0.35,
+          pointRadius: 4,
+          pointBackgroundColor: BRAND_COLORS.hpt,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: { y: { min: -100, max: 100 } },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+function renderDetractorList(rows) {
+  const { detractors } = classifyNps(rows);
+
+  document.getElementById("detractor-title").innerHTML = `⚠ Detractors — Needs Follow-up (${detractors.length})`;
+
+  const container = document.getElementById("detractor-list");
+
+  if (detractors.length === 0) {
+    container.innerHTML = '<p class="empty-note">No detractors in this period.</p>';
+    return;
+  }
+
+  const roomMap = {};
+  mgmtState.rooms.forEach((r) => (roomMap[r.id] = r.room_number));
+  const branchMap = {};
+  mgmtState.branches.forEach((b) => (branchMap[b.id] = BRANCH_NAMES[b.code] || b.name));
+
+  const sorted = [...detractors].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  container.innerHTML = sorted
+    .map((r) => {
+      const date = new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const room = roomMap[r.room_id] || "Unknown room";
+      const branch = branchMap[r.branch_id] || "";
+      const guest = r.guest_name || "Anonymous";
+      const contactLine = r.guest_contact
+        ? `<div class="feedback-meta">📞 ${r.guest_contact}</div>`
+        : `<div class="feedback-meta">No contact info provided</div>`;
+      const commentLine = r.comment ? `<div class="feedback-comment-text">${r.comment.replace(/</g, "&lt;")}</div>` : "";
+
+      return `
+        <div class="feedback-card bad">
+          <div class="feedback-card-header">
+            <span>${guest} — ${branch}, Room ${room}</span>
+            <span class="feedback-card-date">${date}</span>
+          </div>
+          <div class="feedback-ratings"><span class="low">NPS ${r.nps}</span></div>
+          ${commentLine}
+          ${contactLine}
+        </div>
+      `;
+    })
+    .join("");
 }
 
 // ---------- Good / Bad comment grouping ----------
@@ -1078,6 +1236,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       mgmtState.pin = storedPin;
       await loadDashboard();
       showView("view-dashboard");
+      renderDashboard();
       return;
     }
   }
