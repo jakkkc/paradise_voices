@@ -1,9 +1,10 @@
 // Paradise Voices — service worker
-// Caches the app shell so the tablet can still open the app with a
-// weak/no connection. Supabase API calls and CDN scripts always go
-// straight to the network — only our own static files get cached.
+// Network-first: always try to fetch the latest version when online, and
+// only fall back to the cached copy if there's no connection. This avoids
+// tablets getting stuck with a stale mix of old/new files after updates —
+// which is what caused the intermittent "works sometimes" bugs.
 
-const CACHE_NAME = "paradise-voices-v2";
+const CACHE_NAME = "paradise-voices-v3";
 
 const PRECACHE_URLS = [
   "index.html",
@@ -38,24 +39,21 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Only handle our own static GET requests — everything else
-  // (Supabase, Google Fonts, the Supabase JS CDN) goes to the network.
+  // Only handle our own static GET requests — Supabase, Google Fonts, and
+  // the Supabase JS CDN always go straight to the network, untouched.
   if (event.request.method !== "GET" || url.origin !== self.location.origin) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
