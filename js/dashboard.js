@@ -263,6 +263,7 @@ function renderDashboard() {
   renderNpsTrendChart(period);
   renderDetractorList(period);
   renderReferralBreakdown(period);
+  renderSourceBreakdown(period);
   renderBranchComparisonChart();
   renderCategoryChart(period);
   renderLeaderboard(period);

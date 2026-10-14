@@ -342,9 +342,14 @@ async function submitFeedback() {
     comment: document.getElementById("comment-input").value.trim() || null,
     guest_name: document.getElementById("name-input").value.trim() || null,
     guest_contact: document.getElementById("contact-input").value.trim() || null,
+    source: state.source || "tablet",
   };
 
-  const { error } = await db.from("feedback").insert(payload);
+  let { error } = await db.from("feedback").insert(payload);
+  if (error && /source/i.test(error.message || "")) {
+    const { source, ...payloadWithoutSource } = payload;
+    ({ error } = await db.from("feedback").insert(payloadWithoutSource));
+  }
 
   if (error) {
     errorEl.textContent = "Couldn't submit — check your connection and try again.";
@@ -370,7 +375,7 @@ async function submitFeedback() {
     document.getElementById("google-review-btn").href = reviewLink;
     showView("view-review-prompt");
   } else {
-    showView("view-thankyou");
+    showThankYou();
   }
 }
 
@@ -447,9 +452,9 @@ function setupWizardNav() {
   document.getElementById("submit-btn").addEventListener("click", submitFeedback);
 
   document.getElementById("google-review-btn").addEventListener("click", () => {
-    setTimeout(() => showView("view-thankyou"), 300);
+    setTimeout(() => showThankYou(), 300);
   });
-  document.getElementById("review-skip-btn").addEventListener("click", () => showView("view-thankyou"));
+  document.getElementById("review-skip-btn").addEventListener("click", () => showThankYou());
 
   document.getElementById("thankyou-done-btn").addEventListener("click", fullReset);
 }

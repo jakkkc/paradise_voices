@@ -381,3 +381,10 @@ grant execute on function update_team_member(text, text, text, text, text) to an
 -- Done. Next: verify in Table Editor that branches/room_categories/
 -- rooms/staff_roles/team_members all have rows.
 -- ============================================================
+-- ------------------------------------------------------------
+-- Added later: how each response was collected
+-- (reception tablet, a room's QR code, or the reception QR code)
+-- ------------------------------------------------------------
+alter table feedback
+  add column if not exists source text not null default 'tablet'
+  check (source in ('tablet','room_qr','reception_qr'));

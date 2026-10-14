@@ -1047,3 +1047,85 @@ input[type="range"] {
 .status-line.error {
   color: var(--danger);
 }
+
+/* ---- QR code sheet ---- */
+
+.qr-section-title {
+  font-family: var(--font-heading);
+  color: var(--brown);
+  font-size: 1.1rem;
+  margin: 26px 0 12px;
+}
+
+.qr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.qr-grid-reception {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.qr-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  background: #ffffff;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.qr-card-brand {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--terracotta);
+  font-weight: 600;
+}
+
+.qr-card-title {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  color: var(--brown);
+  margin-top: 4px;
+}
+
+.qr-card-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  min-height: 1em;
+}
+
+.qr-code-box {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.qr-code-box img {
+  display: block;
+}
+
+.qr-card-cta {
+  font-size: 0.72rem;
+  color: var(--text-dark);
+  line-height: 1.35;
+}
+
+/* QR guests are on their own phone: never show the staff Install button */
+.guest-self .install-btn {
+  display: none !important;
+}
+
+@media print {
+  #print-report .qr-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  #print-report .qr-grid-reception {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
