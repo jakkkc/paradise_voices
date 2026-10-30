@@ -388,3 +388,228 @@ grant execute on function update_team_member(text, text, text, text, text) to an
 alter table feedback
   add column if not exists source text not null default 'tablet'
   check (source in ('tablet','room_qr','reception_qr'));
+-- ============================================================
+-- Paradise Voices - Loyalty programme, stage 1: database + settings
+-- All loyalty tables are fully locked (RLS on, no policies).
+-- Everything goes through PIN-checked functions, like the rest of the app.
+-- Safe to run more than once.
+-- ============================================================
+
+-- Helper: stops a function unless the management PIN was given.
+create or replace function assert_management(input_pin text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where role_key = 'management' and pin = input_pin) then
+    raise exception 'Invalid management PIN';
+  end if;
+end;
+$$;
+
+revoke execute on function assert_management(text) from public, anon, authenticated;
+
+-- ---- Programme settings (always exactly one row) ----
+create table if not exists loyalty_settings (
+  id boolean primary key default true check (id),
+  earn_percent numeric(5,2) not null default 5
+    check (earn_percent >= 0 and earn_percent <= 100),
+  point_value_kes numeric(10,2) not null default 1
+    check (point_value_kes > 0),
+  expiry_months integer not null default 24
+    check (expiry_months >= 0),
+  large_redemption_points integer not null default 0
+    check (large_redemption_points >= 0),
+  updated_at timestamptz not null default now()
+);
+
+insert into loyalty_settings (id) values (true) on conflict (id) do nothing;
+
+-- ---- Nightly rate per room category (set by management) ----
+create table if not exists loyalty_category_rates (
+  category_id uuid primary key references room_categories(id) on delete cascade,
+  rate_per_night_kes numeric(12,2) not null check (rate_per_night_kes >= 0),
+  updated_at timestamptz not null default now()
+);
+
+-- ---- Fixed rewards offered at the desk ----
+create table if not exists loyalty_rewards (
+  id uuid primary key default gen_random_uuid(),
+  points integer not null check (points > 0),
+  label text not null,
+  sort_order integer not null default 0
+);
+
+insert into loyalty_rewards (points, label, sort_order)
+select v.points, v.label, v.sort_order
+from (values
+  (5000,  'KES 5,000 off the next stay', 1),
+  (10000, 'A room upgrade or KES 10,000 credit', 2),
+  (50000, 'One free night in an Etalangi', 3)
+) as v(points, label, sort_order)
+where not exists (select 1 from loyalty_rewards);
+
+-- ---- Members (identified by phone number, stored as +2547XXXXXXXX) ----
+create table if not exists loyalty_members (
+  id uuid primary key default gen_random_uuid(),
+  phone text not null unique,
+  name text not null,
+  email text,
+  consent_at timestamptz not null default now(),
+  enrolled_branch_id uuid references branches(id),
+  created_at timestamptz not null default now()
+);
+
+-- ---- Ledger: every earn / redeem / adjustment is its own permanent line ----
+-- A member's balance is the total of their lines. Positive points add,
+-- negative points subtract.
+create table if not exists loyalty_transactions (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid not null references loyalty_members(id),
+  type text not null check (type in ('earn','bonus','redeem','adjust','expire')),
+  points integer not null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz,
+  branch_id uuid references branches(id),
+  staff_role text,
+  room_id uuid references rooms(id),
+  category_id uuid references room_categories(id),
+  nights integer check (nights is null or nights > 0),
+  rate_per_night_kes numeric(12,2),
+  earn_percent numeric(5,2),
+  point_value_kes numeric(10,2),
+  stay_date date,
+  reward_label text,
+  note text,
+  constraint loyalty_points_sign check (
+    points <> 0 and (
+      (type in ('earn','bonus') and points > 0)
+      or (type = 'redeem' and points < 0)
+      or type in ('adjust','expire')
+    )
+  )
+);
+
+-- The same member cannot be awarded twice for the same room on the same day.
+create unique index if not exists loyalty_one_award_per_stay
+  on loyalty_transactions (member_id, room_id, stay_date)
+  where type = 'earn';
+
+create index if not exists loyalty_tx_member on loyalty_transactions (member_id, created_at);
+
+-- Lock every loyalty table: no direct access, only through the functions.
+alter table loyalty_settings enable row level security;
+alter table loyalty_category_rates enable row level security;
+alter table loyalty_rewards enable row level security;
+alter table loyalty_members enable row level security;
+alter table loyalty_transactions enable row level security;
+
+-- ---- Management: read all programme settings in one go ----
+create or replace function get_loyalty_settings(input_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform assert_management(input_pin);
+
+  return jsonb_build_object(
+    'settings', (select to_jsonb(s) - 'id' from loyalty_settings s limit 1),
+    'rates', coalesce((
+      select jsonb_agg(
+               jsonb_build_object(
+                 'category_id', rc.id,
+                 'category_name', rc.name,
+                 'branch_code', b.code,
+                 'rate_per_night_kes', r.rate_per_night_kes
+               )
+               order by b.code, rc.name
+             )
+      from room_categories rc
+      join branches b on b.id = rc.branch_id
+      left join loyalty_category_rates r on r.category_id = rc.id
+    ), '[]'::jsonb),
+    'rewards', coalesce((
+      select jsonb_agg(
+               jsonb_build_object('points', w.points, 'label', w.label)
+               order by w.sort_order, w.points
+             )
+      from loyalty_rewards w
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+-- ---- Management: save all programme settings in one go ----
+create or replace function save_loyalty_settings(input_mgmt_pin text, payload jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_earn numeric;
+  v_value numeric;
+  v_expiry integer;
+  v_large integer;
+  item jsonb;
+begin
+  perform assert_management(input_mgmt_pin);
+
+  v_earn := (payload->>'earn_percent')::numeric;
+  v_value := (payload->>'point_value_kes')::numeric;
+  v_expiry := (payload->>'expiry_months')::integer;
+  v_large := (payload->>'large_redemption_points')::integer;
+
+  if v_earn is null or v_earn < 0 or v_earn > 100 then
+    raise exception 'Earn percentage must be between 0 and 100';
+  end if;
+  if v_value is null or v_value <= 0 then
+    raise exception 'Value of one point must be more than 0';
+  end if;
+  if v_expiry is null or v_expiry < 0 then
+    raise exception 'Expiry months cannot be negative';
+  end if;
+  if v_large is null or v_large < 0 then
+    raise exception 'Large redemption flag cannot be negative';
+  end if;
+
+  update loyalty_settings
+  set earn_percent = v_earn,
+      point_value_kes = v_value,
+      expiry_months = v_expiry,
+      large_redemption_points = v_large,
+      updated_at = now()
+  where id = true;
+
+  -- Nightly rates: a blank rate clears that category's rate.
+  for item in select value from jsonb_array_elements(coalesce(payload->'rates', '[]'::jsonb)) loop
+    if coalesce(trim(item->>'rate'), '') = '' then
+      delete from loyalty_category_rates where category_id = (item->>'category_id')::uuid;
+    else
+      if (item->>'rate')::numeric < 0 then
+        raise exception 'Nightly rates cannot be negative';
+      end if;
+      insert into loyalty_category_rates (category_id, rate_per_night_kes)
+      values ((item->>'category_id')::uuid, (item->>'rate')::numeric)
+      on conflict (category_id)
+      do update set rate_per_night_kes = excluded.rate_per_night_kes, updated_at = now();
+    end if;
+  end loop;
+
+  -- Rewards: the saved list replaces the old one.
+  delete from loyalty_rewards where id is not null;
+  insert into loyalty_rewards (points, label, sort_order)
+  select (e.value->>'points')::integer, trim(e.value->>'label'), (e.ord - 1)::integer
+  from jsonb_array_elements(coalesce(payload->'rewards', '[]'::jsonb)) with ordinality as e(value, ord)
+  where coalesce(trim(e.value->>'label'), '') <> '';
+end;
+$$;
+
+grant execute on function get_loyalty_settings(text) to anon;
+grant execute on function save_loyalty_settings(text, jsonb) to anon;
+
+notify pgrst, 'reload schema';

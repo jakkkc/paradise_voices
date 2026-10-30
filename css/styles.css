@@ -1129,3 +1129,80 @@ input[type="range"] {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---- Loyalty settings ---- */
+
+.loyalty-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0 18px;
+}
+
+.loyalty-muted {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.loyalty-preview {
+  background: var(--cream);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+}
+
+.loyalty-branch-title {
+  font-family: var(--font-heading);
+  color: var(--brown);
+  font-size: 1rem;
+  margin: 14px 0 4px;
+}
+
+.loyalty-branch-title:first-child {
+  margin-top: 0;
+}
+
+.loyalty-rate-row,
+.loyalty-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.loyalty-rate-row span {
+  flex: 1;
+  font-size: 0.92rem;
+}
+
+.loyalty-rate-row input {
+  width: 160px;
+  margin-bottom: 0;
+  text-align: right;
+}
+
+.loyalty-reward-row input {
+  margin-bottom: 0;
+}
+
+.loyalty-reward-row .reward-points {
+  width: 110px;
+}
+
+.loyalty-reward-row .reward-label {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .loyalty-reward-row {
+    flex-wrap: wrap;
+  }
+
+  .loyalty-reward-row .reward-label {
+    flex-basis: 100%;
+    order: 3;
+  }
+}
