@@ -1206,3 +1206,119 @@ input[type="range"] {
     order: 3;
   }
 }
+
+/* ---- Loyalty desk (reception) ---- */
+
+.desk-card {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 14px 0;
+}
+
+.desk-name {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  color: var(--brown);
+}
+
+.desk-phone {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.desk-balance-points {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  color: var(--brown);
+  line-height: 1.1;
+}
+
+.desk-balance-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.desk-expiry {
+  font-size: 0.8rem;
+  color: var(--danger);
+  margin-top: 6px;
+}
+
+.desk-activity-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--terracotta);
+  font-weight: 600;
+  margin: 14px 0 4px;
+}
+
+.desk-activity-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.desk-activity-row:last-child {
+  border-bottom: none;
+}
+
+.desk-plus {
+  color: var(--success);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.desk-minus {
+  color: var(--danger);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.desk-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.desk-reward {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--text-dark);
+  font-size: 0.9rem;
+}
+
+.desk-reward strong {
+  color: var(--brown);
+  white-space: nowrap;
+}
+
+.desk-reward.active {
+  border-color: var(--terracotta);
+  background: var(--cream);
+}
+
+.desk-reward:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Guests who scan a QR code must never see staff tools */
+.guest-self #loyalty-open-btn {
+  display: none !important;
+}
