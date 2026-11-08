@@ -1194,68 +1194,137 @@ function currentFilterLabel() {
   return `${branchLabel} • ${dateLabel}`;
 }
 
+// Prints with a one-off @page rule (paper size / margin), then removes it so the
+// report and the QR sheet can each use their own page setup.
+function printWithPageRule(rule) {
+  const style = document.createElement("style");
+  style.id = "print-page-rule";
+  style.textContent = `@page { ${rule} }`;
+  document.head.appendChild(style);
+  const cleanup = () => {
+    style.remove();
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  window.print();
+}
+
+function cloneForReport(id) {
+  const src = document.getElementById(id);
+  if (!src) return "";
+  const copy = src.cloneNode(true);
+  copy.removeAttribute("id");
+  copy.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+  return copy.outerHTML;
+}
+
+// A chart as a picture, taken from the live dashboard chart. wrapId is the
+// element the dashboard hides when the chart has no data.
+function reportChartHtml(chart, wrapId, emptyText) {
+  const wrap = wrapId ? document.getElementById(wrapId) : null;
+  const hidden = wrap && wrap.style.display === "none";
+  if (!chart || hidden) return `<p class="empty-note">${emptyText}</p>`;
+  try {
+    chart.stop();
+    chart.update("none"); // finish any entry animation so the picture is the full chart
+    return `<img class="report-chart-img" src="${chart.toBase64Image("image/png", 1)}" alt="" />`;
+  } catch (e) {
+    return `<p class="empty-note">${emptyText}</p>`;
+  }
+}
+
 function generateAndPrintReport() {
   const rows = periodFilteredRows();
   const label = currentFilterLabel();
   const generatedAt = new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-
-  const nps = computeNps(rows);
-  const csat = computeCsat(rows);
-  const referral = computeReferralBreakdown(rows);
+  const noData = "No data in this period.";
 
   const roomMap = {};
   mgmtState.rooms.forEach((r) => (roomMap[r.id] = r.room_number));
   const branchMap = {};
   mgmtState.branches.forEach((b) => (branchMap[b.id] = BRANCH_NAMES[b.code] || b.name));
 
-  const commentsRows = rows.filter((r) => r.comment).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const { detractors } = classifyNps(rows);
+  const detractorHtml = detractors.length
+    ? `<table>
+        <tr><th>Date</th><th>Guest</th><th>Branch · Room</th><th>NPS</th><th>Contact</th></tr>
+        ${[...detractors]
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .map((r) => {
+            const date = new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+            return `<tr><td>${date}</td><td>${esc(r.guest_name || "Anonymous")}</td><td>${esc(branchMap[r.branch_id] || "")} · ${esc(roomMap[r.room_id] || "?")}</td><td>${r.nps}</td><td>${esc(r.guest_contact || "–")}</td></tr>`;
+          })
+          .join("")}
+      </table>`
+    : '<p class="empty-note">No detractors in this period.</p>';
 
-  let html = `
+  const html = `
     <h1>Paradise Voices — Guest Feedback Report</h1>
     <div class="report-meta">${label} • Generated ${generatedAt} • ${rows.length} response${rows.length === 1 ? "" : "s"}</div>
 
-    <div class="report-section-title">Summary</div>
-    <table>
-      <tr><th>Metric</th><th>Value</th></tr>
-      <tr><td>Total Responses</td><td>${rows.length}</td></tr>
-      <tr><td>NPS Score</td><td>${nps ? nps.score : "–"}</td></tr>
-      <tr><td>CSAT</td><td>${csat ? csat.pct + "%" : "–"}</td></tr>
-      ${RATING_FIELDS.map((f) => `<tr><td>${f.label}</td><td>${formatAvg(average(rows, f.key))}</td></tr>`).join("")}
-    </table>
+    <div class="report-block">
+      <div class="report-section-title">Key Numbers</div>
+      ${cloneForReport("icon-stat-row")}
+    </div>
 
-    <div class="report-section-title">How Guests Heard About Us</div>
-    <table>
-      <tr><th>Source</th><th>Count</th><th>Percent</th></tr>
-      ${referral.map((r) => `<tr><td style="text-transform:capitalize;">${r.key}</td><td>${r.count}</td><td>${r.pct}%</td></tr>`).join("")}
-    </table>
+    <div class="report-block">
+      <div class="report-section-title">Category Ratings</div>
+      ${cloneForReport("stat-grid")}
+    </div>
 
-    <div class="report-section-title">Guest Comments (${commentsRows.length})</div>
+    <div class="report-block">${cloneForReport("alltime-panel")}</div>
+
+    <div class="report-block">
+      <div class="report-section-title">Rating Trend</div>
+      ${reportChartHtml(trendChartInstance, "trend-chart-canvas-wrap", noData)}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">NPS Breakdown</div>
+      <div class="report-chart-small">${reportChartHtml(npsBreakdownChartInstance, "nps-breakdown-wrap", "No NPS responses in this period.")}</div>
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">NPS Trend</div>
+      ${reportChartHtml(npsTrendChartInstance, "nps-trend-canvas-wrap", "No NPS responses in this period.")}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">Branch Comparison</div>
+      ${reportChartHtml(branchChartInstance, null, noData)}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">Room Category Performance</div>
+      ${reportChartHtml(categoryChartInstance, null, noData)}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">Staff Leaderboard</div>
+      ${cloneForReport("leaderboard-list")}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">How Guests Heard About Us</div>
+      ${cloneForReport("referral-breakdown")}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">How Feedback Was Collected</div>
+      ${cloneForReport("source-breakdown")}
+    </div>
+
+    <div class="report-block">
+      <div class="report-section-title">Detractors — Needs Follow-up (${detractors.length})</div>
+      ${detractorHtml}
+    </div>
   `;
 
-  if (commentsRows.length === 0) {
-    html += `<p>No comments for this selection.</p>`;
-  } else {
-    commentsRows.forEach((r) => {
-      const date = new Date(r.created_at).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-      const room = roomMap[r.room_id] || "Unknown room";
-      const branch = branchMap[r.branch_id] || "";
-      const guest = r.guest_name || "Anonymous";
-      const contact = r.guest_contact ? ` • ${r.guest_contact}` : "";
-      html += `
-        <div class="report-comment">
-          <div class="report-comment-meta">${guest}${contact} • ${branch}, Room ${room} • ${date}</div>
-          <div>${r.comment.replace(/</g, "&lt;")}</div>
-        </div>
-      `;
-    });
-  }
-
-  document.getElementById("print-report").innerHTML = html;
-  window.print();
+  const target = document.getElementById("print-report");
+  target.className = "";
+  target.innerHTML = html;
+  printWithPageRule("size: A4 portrait; margin: 12mm;");
 }
 
 // ---------- Wiring ----------

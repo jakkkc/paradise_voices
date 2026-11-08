@@ -78,7 +78,7 @@ function naturalRoomSort(a, b) {
   return numA - numB;
 }
 
-function makeQrCard({ title, subtitle, cta, url, size }) {
+function makeQrCard({ title, subtitle, cta, url }) {
   const card = document.createElement("div");
   card.className = "qr-card";
   card.innerHTML = `
@@ -88,13 +88,29 @@ function makeQrCard({ title, subtitle, cta, url, size }) {
     <div class="qr-code-box"></div>
     <div class="qr-card-cta">${cta}</div>
   `;
+  // Drawn large so it stays sharp when printed; CSS sets the displayed size.
   new QRCode(card.querySelector(".qr-code-box"), {
     text: url,
-    width: size,
-    height: size,
+    width: 320,
+    height: 320,
     correctLevel: QRCode.CorrectLevel.M,
   });
   return card;
+}
+
+// A4 page with four A6 cells (2 x 2). Dashed lines between the cells are the cutting lines.
+function appendQrPages(sheet, cards) {
+  for (let i = 0; i < cards.length; i += 4) {
+    const page = document.createElement("div");
+    page.className = "qr-page";
+    for (let slot = 0; slot < 4; slot++) {
+      const cell = document.createElement("div");
+      cell.className = "qr-cell";
+      if (cards[i + slot]) cell.appendChild(cards[i + slot]);
+      page.appendChild(cell);
+    }
+    sheet.appendChild(page);
+  }
 }
 
 function buildQrSheet() {
@@ -117,28 +133,28 @@ function buildQrSheet() {
   }
   warning.style.display = "none";
 
-  // Reception codes: guests pick their own room
-  const receptionTitle = document.createElement("h3");
-  receptionTitle.className = "qr-section-title";
-  receptionTitle.textContent = "Reception";
-  sheet.appendChild(receptionTitle);
+  const addSection = (text, cards) => {
+    const heading = document.createElement("h3");
+    heading.className = "qr-section-title";
+    heading.textContent = text;
+    sheet.appendChild(heading);
+    appendQrPages(sheet, cards);
+  };
 
-  const receptionGrid = document.createElement("div");
-  receptionGrid.className = "qr-grid qr-grid-reception";
-  mgmtState.branches.forEach((b) => {
-    receptionGrid.appendChild(
+  // Reception codes: guests pick their own room
+  addSection(
+    "Reception",
+    mgmtState.branches.map((b) =>
       makeQrCard({
         title: "Reception",
         subtitle: BRANCH_NAMES[b.code] || b.name,
         cta: "Forgot to rate your stay? Scan to share your feedback",
         url: `${base}?b=${encodeURIComponent(b.code)}`,
-        size: 190,
       })
-    );
-  });
-  sheet.appendChild(receptionGrid);
+    )
+  );
 
-  // Room codes: room is pre-filled
+  // Room codes: room is pre-filled. Each branch starts on a fresh page.
   const { roomCatMap, catNameMap } = roomCategoryMaps();
   mgmtState.branches.forEach((b) => {
     const rooms = mgmtState.rooms
@@ -150,25 +166,17 @@ function buildQrSheet() {
       });
     if (rooms.length === 0) return;
 
-    const title = document.createElement("h3");
-    title.className = "qr-section-title";
-    title.textContent = `${BRANCH_NAMES[b.code] || b.name} — Rooms (${rooms.length})`;
-    sheet.appendChild(title);
-
-    const grid = document.createElement("div");
-    grid.className = "qr-grid";
-    rooms.forEach((r) => {
-      grid.appendChild(
+    addSection(
+      `${BRANCH_NAMES[b.code] || b.name} — Rooms (${rooms.length})`,
+      rooms.map((r) =>
         makeQrCard({
           title: `Room ${r.room_number}`,
           subtitle: catNameMap[roomCatMap[r.id]] || "",
           cta: "Scan to share your feedback",
           url: `${base}?b=${encodeURIComponent(b.code)}&room=${encodeURIComponent(r.room_number)}`,
-          size: 130,
         })
-      );
-    });
-    sheet.appendChild(grid);
+      )
+    );
   });
 }
 
@@ -182,13 +190,11 @@ function openQrView() {
 function printQrSheet() {
   const sheet = document.getElementById("qr-sheet");
   if (!sheet.children.length) return;
-  const generatedAt = new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  document.getElementById("print-report").innerHTML = `
-    <h1>Paradise Voices — QR Codes</h1>
-    <div class="report-meta">Generated ${generatedAt}</div>
-    ${sheet.innerHTML}
-  `;
-  window.print();
+  const target = document.getElementById("print-report");
+  target.className = "qr-print";
+  target.innerHTML = sheet.innerHTML;
+  // Full A4, no margin: the cells are exactly A6 and the dashed lines are the cuts.
+  printWithPageRule("size: A4 portrait; margin: 0;");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
