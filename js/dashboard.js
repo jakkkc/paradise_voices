@@ -770,6 +770,39 @@ function buildRatingsRowHtml(row, badKeys) {
   return parts.join("");
 }
 
+function escHtml(text) {
+  return String(text === null || text === undefined ? "" : text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// A row that needed attention and was marked resolved by management.
+function isResolved(row) {
+  return !!row.resolved_at;
+}
+
+// The "Resolved" button on open items, or the note + "Reopen" on resolved ones.
+// Both are handled by the click handler in dashboard-feedback.js.
+function resolveControlsHtml(row) {
+  if (isResolved(row)) {
+    const when = new Date(row.resolved_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return `
+      <div class="resolve-row">
+        <div class="resolved-note"><strong>Resolved ${escHtml(when)}:</strong> ${escHtml(row.resolved_note || "")}</div>
+        <button type="button" class="btn-resolve btn-reopen" data-reopen-id="${escHtml(row.id)}">Reopen</button>
+      </div>`;
+  }
+  if (getBadTriggers(row).length > 0) {
+    return `
+      <div class="resolve-row">
+        <button type="button" class="btn-resolve" data-resolve-id="${escHtml(row.id)}">Resolved</button>
+      </div>`;
+  }
+  return "";
+}
+
 function renderCommentCard(row, badKeys, type, roomMap, branchMap) {
   const date = new Date(row.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const room = roomMap[row.room_id] || "Unknown room";
@@ -788,12 +821,13 @@ function renderCommentCard(row, badKeys, type, roomMap, branchMap) {
   return `
     <div class="feedback-card ${type}">
       <div class="feedback-card-header">
-        <span>${branch} · Room ${room}</span>
+        <span>${escHtml(branch)} · Room ${escHtml(room)}</span>
         <span class="feedback-card-date">${date}</span>
       </div>
       <div class="feedback-ratings">${buildRatingsRowHtml(row, badKeys)}</div>
-      <div class="feedback-comment-text">${row.comment.replace(/</g, "&lt;")}</div>
-      ${metaLine ? `<div class="feedback-meta">${metaLine}</div>` : ""}
+      <div class="feedback-comment-text">${escHtml(row.comment)}</div>
+      ${metaLine ? `<div class="feedback-meta">${escHtml(metaLine)}</div>` : ""}
+      ${type === "good" ? "" : resolveControlsHtml(row)}
     </div>
   `;
 }
@@ -808,14 +842,18 @@ function renderCommentGroups(rows) {
 
   const good = [];
   const bad = [];
+  const resolved = [];
   withComments.forEach((r) => {
     const triggers = getBadTriggers(r);
-    if (triggers.length === 0) good.push(r);
+    if (isResolved(r)) resolved.push({ row: r, triggers });
+    else if (triggers.length === 0) good.push(r);
     else bad.push({ row: r, triggers });
   });
+  resolved.sort((a, b) => new Date(b.row.resolved_at) - new Date(a.row.resolved_at));
 
   document.getElementById("good-comments-title").innerHTML = `✓ Best Feedback (${good.length})`;
   document.getElementById("bad-comments-title").innerHTML = `⚠ Needs Attention (${bad.length})`;
+  document.getElementById("resolved-comments-title").innerHTML = `✔ Resolved (${resolved.length})`;
 
   const goodContainer = document.getElementById("good-comments-list");
   goodContainer.innerHTML =
@@ -830,6 +868,15 @@ function renderCommentGroups(rows) {
       : bad
           .slice(0, 20)
           .map(({ row, triggers }) => renderCommentCard(row, new Set(triggers.map((t) => t.key)), "bad", roomMap, branchMap))
+          .join("");
+
+  const resolvedContainer = document.getElementById("resolved-comments-list");
+  resolvedContainer.innerHTML =
+    resolved.length === 0
+      ? '<p class="empty-note">Nothing resolved in this period yet.</p>'
+      : resolved
+          .slice(0, 20)
+          .map(({ row, triggers }) => renderCommentCard(row, new Set(triggers.map((t) => t.key)), "resolved", roomMap, branchMap))
           .join("");
 }
 

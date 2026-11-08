@@ -613,3 +613,75 @@ grant execute on function get_loyalty_settings(text) to anon;
 grant execute on function save_loyalty_settings(text, jsonb) to anon;
 
 notify pgrst, 'reload schema';
+
+-- ============================================================
+-- Paradise Voices - Resolved feedback
+-- Management can mark feedback that needed attention as resolved
+-- (with a short note) and reopen it again. Safe to run more than once.
+-- ============================================================
+
+alter table feedback
+  add column if not exists resolved_at timestamptz,
+  add column if not exists resolved_note text;
+
+-- Guests may only submit open (unresolved) feedback.
+drop policy if exists "anyone can submit feedback" on feedback;
+create policy "anyone can submit feedback" on feedback
+  for insert
+  with check (resolved_at is null and resolved_note is null);
+
+create or replace function resolve_feedback(
+  input_mgmt_pin text,
+  input_feedback_id uuid,
+  input_note text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform assert_management(input_mgmt_pin);
+
+  if input_note is null or char_length(trim(input_note)) < 3 then
+    raise exception 'Please say briefly what was done (at least 3 characters)';
+  end if;
+
+  update feedback
+  set resolved_at = now(),
+      resolved_note = trim(input_note)
+  where id = input_feedback_id;
+
+  if not found then
+    raise exception 'Feedback not found';
+  end if;
+end;
+$$;
+
+create or replace function reopen_feedback(
+  input_mgmt_pin text,
+  input_feedback_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform assert_management(input_mgmt_pin);
+
+  update feedback
+  set resolved_at = null,
+      resolved_note = null
+  where id = input_feedback_id;
+
+  if not found then
+    raise exception 'Feedback not found';
+  end if;
+end;
+$$;
+
+grant execute on function resolve_feedback(text, uuid, text) to anon;
+grant execute on function reopen_feedback(text, uuid) to anon;
+
+notify pgrst, 'reload schema';
