@@ -389,7 +389,7 @@ function renderReferralBreakdown(rows) {
     row.innerHTML = `
       <div class="referral-bar-name">${item.key}</div>
       <div class="referral-bar-track"><div class="referral-bar-fill" style="width:${item.pct}%"></div></div>
-      <div class="referral-bar-pct">${item.pct}%</div>
+      <div class="referral-bar-pct">${item.count}</div>
     `;
     container.appendChild(row);
   });
