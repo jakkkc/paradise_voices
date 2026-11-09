@@ -1280,6 +1280,67 @@ function reportChartHtml(chart, wrapId, emptyText) {
   }
 }
 
+const REPORT_STATUS_LABELS = { open: "Open", resolved: "Resolved", good: "Good" };
+
+// One comment as a print-friendly card with a status tag. No buttons.
+function reportCommentHtml(row, status, roomMap, branchMap) {
+  const badKeys = new Set(getBadTriggers(row).map((t) => t.key));
+  const date = new Date(row.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  const servedBy = getMentionNames(row.id);
+
+  const metaParts = [];
+  if (servedBy.length) metaParts.push(`Served by ${servedBy.join(", ")}`);
+  if (row.guest_name) metaParts.push(row.guest_name);
+  if (row.guest_contact) metaParts.push(row.guest_contact);
+
+  let resolvedLine = "";
+  if (status === "resolved") {
+    const when = new Date(row.resolved_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    resolvedLine = `<div class="report-resolved-line"><strong>Resolved ${escHtml(when)}:</strong> ${escHtml(row.resolved_note || "")}</div>`;
+  }
+
+  return `
+    <div class="feedback-card ${status === "open" ? "bad" : status} report-feedback">
+      <div class="feedback-card-header">
+        <span><span class="report-tag ${status}">${REPORT_STATUS_LABELS[status]}</span> ${escHtml(branchMap[row.branch_id] || "")} · Room ${escHtml(roomMap[row.room_id] || "?")}</span>
+        <span class="feedback-card-date">${escHtml(date)}</span>
+      </div>
+      <div class="feedback-ratings">${buildRatingsRowHtml(row, badKeys)}</div>
+      <div class="feedback-comment-text">${escHtml(row.comment)}</div>
+      ${metaParts.length ? `<div class="feedback-meta">${escHtml(metaParts.join(" · "))}</div>` : ""}
+      ${resolvedLine}
+    </div>
+  `;
+}
+
+// Every comment in the chosen period, in three groups: needs attention, resolved, good.
+function reportCommentsHtml(rows, roomMap, branchMap) {
+  const withComments = rows.filter((r) => r.comment).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const groups = { open: [], resolved: [], good: [] };
+  withComments.forEach((r) => {
+    if (isResolved(r)) groups.resolved.push(r);
+    else if (getBadTriggers(r).length > 0) groups.open.push(r);
+    else groups.good.push(r);
+  });
+  groups.resolved.sort((a, b) => new Date(b.resolved_at) - new Date(a.resolved_at));
+
+  const section = (key, title, emptyText) => `
+    <div class="report-comment-group">
+      <div class="report-section-title">${title} (${groups[key].length})</div>
+      ${groups[key].length ? groups[key].map((r) => reportCommentHtml(r, key, roomMap, branchMap)).join("") : `<p class="empty-note">${emptyText}</p>`}
+    </div>`;
+
+  return `
+    <div class="report-comments">
+      <h2 class="report-comments-title">Guest Comments (${withComments.length})</h2>
+      <p class="report-meta">${groups.open.length} needing attention · ${groups.resolved.length} resolved · ${groups.good.length} good. This section includes guest names and contact details.</p>
+      ${section("open", "Needs Attention", "Nothing needs attention in this period.")}
+      ${section("resolved", "Resolved", "Nothing resolved in this period.")}
+      ${section("good", "Good Feedback", "No other comments in this period.")}
+    </div>`;
+}
+
 function generateAndPrintReport() {
   const rows = periodFilteredRows();
   const label = currentFilterLabel();
@@ -1366,6 +1427,8 @@ function generateAndPrintReport() {
       <div class="report-section-title">Detractors — Needs Follow-up (${detractors.length})</div>
       ${detractorHtml}
     </div>
+
+    ${reportCommentsHtml(rows, roomMap, branchMap)}
   `;
 
   const target = document.getElementById("print-report");

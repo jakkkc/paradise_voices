@@ -1542,3 +1542,59 @@ input[type="range"] {
 #fb-summary {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
+
+/* ---- Report: guest comments ---- */
+
+#print-report .report-comments {
+  break-before: page;
+  page-break-before: always;
+}
+
+#print-report .report-comments-title {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  color: #2B1B0F;
+  margin: 0 0 4px;
+}
+
+#print-report .report-comment-group .report-section-title {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+#print-report .report-feedback {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+#print-report .report-resolved-line {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #2B1B0F;
+}
+
+#print-report .report-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+#print-report .report-tag.open {
+  background: var(--danger);
+}
+
+#print-report .report-tag.resolved {
+  background: #6B7280;
+}
+
+#print-report .report-tag.good {
+  background: var(--success);
+}
