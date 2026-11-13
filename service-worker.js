@@ -4,16 +4,22 @@
 // tablets getting stuck with a stale mix of old/new files after updates —
 // which is what caused the intermittent "works sometimes" bugs.
 
-const CACHE_NAME = "paradise-voices-v3";
+const CACHE_NAME = "paradise-voices-v4";
 
 const PRECACHE_URLS = [
   "index.html",
   "dashboard.html",
   "manifest.json",
   "css/styles.css",
-  "js/app.js",
-  "js/dashboard.js",
   "js/supabase-client.js",
+  "js/app.js",
+  "js/guest-mode.js",
+  "js/loyalty-reception.js",
+  "js/dashboard.js",
+  "js/dashboard-loyalty.js",
+  "js/dashboard-loyalty-overview.js",
+  "js/dashboard-qr.js",
+  "js/dashboard-feedback.js",
   "assets/logo.png",
   "assets/icon-192.png",
   "assets/icon-512.png",

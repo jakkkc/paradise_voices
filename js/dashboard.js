@@ -32,6 +32,7 @@ const RATING_FIELDS = [
   { key: "housekeeping_rating", label: "Housekeeping" },
   { key: "room_comfort_rating", label: "Room Comfort" },
   { key: "facilities_rating", label: "Facilities" },
+  { key: "wifi_rating", label: "Wifi & Speed" },
   { key: "value_rating", label: "Value for Money" },
   { key: "overall_rating", label: "Overall Stay" },
 ];
@@ -46,6 +47,14 @@ const ICONS = {
   users: '<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   trend: '<svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="14 6 21 6 21 13"/></svg>',
 };
+
+// YYYY-MM-DD in the viewer's own time zone. toISOString() is UTC, which put
+// late-evening Kenyan responses (after 21:00) on the next day's chart point.
+function localDayKey(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 function showView(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
@@ -107,6 +116,27 @@ function setupMgmtPinPad() {
 
 // ---------- Data loading ----------
 
+// Supabase caps every response at 1000 rows, so a long-running property would
+// silently lose its oldest feedback. This reads page after page until done.
+async function fetchAllRows(makeQuery, keyOf) {
+  const PAGE = 1000;
+  const rows = [];
+  const seen = new Set();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    (data || []).forEach((row) => {
+      const key = keyOf(row);
+      if (!seen.has(key)) {
+        seen.add(key);
+        rows.push(row);
+      }
+    });
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: rows, error: null };
+}
+
 async function loadDashboard() {
   const [
     { data: feedback, error: fbError },
@@ -116,13 +146,23 @@ async function loadDashboard() {
     { data: mentions, error: mentionsError },
     { data: teamMembers },
   ] = await Promise.all([
-    db.rpc("get_management_feedback", { input_pin: mgmtState.pin }),
+    fetchAllRows(() => db.rpc("get_management_feedback", { input_pin: mgmtState.pin }), (r) => r.id),
     db.from("branches").select("id, code, name"),
     db.from("rooms").select("id, room_number, category_id, branch_id"),
     db.from("room_categories").select("id, name, branch_id"),
-    db.rpc("get_management_mentions", { input_pin: mgmtState.pin }),
+    fetchAllRows(
+      () => db.rpc("get_management_mentions", { input_pin: mgmtState.pin }),
+      (m) => m.feedback_id + "|" + m.team_member_id
+    ),
     db.from("team_members").select("id, name, department"),
   ]);
+
+  // A failed load used to show an empty dashboard with no explanation.
+  const errorEl = document.getElementById("dashboard-load-error");
+  if (errorEl) {
+    errorEl.textContent = fbError ? "Couldn't load the feedback. Check your connection and reload the page." : "";
+    errorEl.style.display = fbError ? "block" : "none";
+  }
 
   mgmtState.feedback = fbError ? [] : feedback || [];
   mgmtState.branches = branches || [];
@@ -333,7 +373,7 @@ function renderAllTimeOverview(rows) {
       const branchRows = byBranch[b.id] || [];
       if (branchRows.length === 0) return "";
       const avg = pooledAverage(branchRows);
-      return `<div class="overview-row"><span>${BRANCH_NAMES[b.code] || b.name}</span><span>${formatAvg(avg)} <span class="count">(${branchRows.length})</span></span></div>`;
+      return `<div class="overview-row"><span>${escHtml(BRANCH_NAMES[b.code] || b.name)}</span><span>${formatAvg(avg)} <span class="count">(${branchRows.length})</span></span></div>`;
     })
     .join("");
 
@@ -350,13 +390,13 @@ function renderAllTimeOverview(rows) {
     .map((name) => {
       const catRows = byCat[name];
       const avg = pooledAverage(catRows);
-      return `<div class="overview-row"><span>${name}</span><span>${formatAvg(avg)} <span class="count">(${catRows.length})</span></span></div>`;
+      return `<div class="overview-row"><span>${escHtml(name)}</span><span>${formatAvg(avg)} <span class="count">(${catRows.length})</span></span></div>`;
     })
     .join("");
 
   panel.innerHTML = `
     <h3>All-Time Overall Experience</h3>
-    <p class="overview-desc">Combines all 6 rating categories, across every submission ever received. Not affected by the filters above.</p>
+    <p class="overview-desc">Combines all ${RATING_FIELDS.length} rating categories, across every submission ever received. Not affected by the filters above.</p>
     <div>
       <span class="overview-big">${formatAvg(overallAvg)}</span>
       <span class="overview-big-sub">/ 5 — ${rows.length} review${rows.length === 1 ? "" : "s"}</span>
@@ -472,7 +512,7 @@ function renderCategoryChart(rows) {
 function renderTrendChart(rows) {
   const byDay = {};
   rows.forEach((r) => {
-    const day = new Date(r.created_at).toISOString().slice(0, 10);
+    const day = localDayKey(r.created_at);
     if (!byDay[day]) byDay[day] = [];
     byDay[day].push(r);
   });
@@ -574,7 +614,7 @@ function renderNpsTrendChart(rows) {
   const answered = rows.filter((r) => r.nps !== null && r.nps !== undefined);
   const byDay = {};
   answered.forEach((r) => {
-    const day = new Date(r.created_at).toISOString().slice(0, 10);
+    const day = localDayKey(r.created_at);
     if (!byDay[day]) byDay[day] = [];
     byDay[day].push(r.nps);
   });
@@ -653,14 +693,14 @@ function renderDetractorList(rows) {
       const branch = branchMap[r.branch_id] || "";
       const guest = r.guest_name || "Anonymous";
       const contactLine = r.guest_contact
-        ? `<div class="feedback-meta">📞 ${r.guest_contact}</div>`
+        ? `<div class="feedback-meta">📞 ${escHtml(r.guest_contact)}</div>`
         : `<div class="feedback-meta">No contact info provided</div>`;
-      const commentLine = r.comment ? `<div class="feedback-comment-text">${r.comment.replace(/</g, "&lt;")}</div>` : "";
+      const commentLine = r.comment ? `<div class="feedback-comment-text">${escHtml(r.comment)}</div>` : "";
 
       return `
         <div class="feedback-card bad">
           <div class="feedback-card-header">
-            <span>${guest} — ${branch}, Room ${room}</span>
+            <span>${escHtml(guest)} — ${escHtml(branch)}, Room ${escHtml(room)}</span>
             <span class="feedback-card-date">${date}</span>
           </div>
           <div class="feedback-ratings"><span class="low">NPS ${r.nps}</span></div>
@@ -722,7 +762,7 @@ function renderLeaderboard(rows) {
       (entry, idx) => `
       <div class="leaderboard-row">
         <span class="leaderboard-rank">${medals[idx] || idx + 1}</span>
-        <span class="leaderboard-name">${entry.name} <span class="leaderboard-dept">(${entry.department})</span></span>
+        <span class="leaderboard-name">${escHtml(entry.name)} <span class="leaderboard-dept">(${escHtml(entry.department)})</span></span>
         <span class="leaderboard-mentions">${entry.mentions} mention${entry.mentions === 1 ? "" : "s"}</span>
         <span class="leaderboard-score">${entry.avgScore !== null ? entry.avgScore.toFixed(1) + "★ avg" : ""}</span>
       </div>
@@ -907,9 +947,9 @@ function renderStaffList(staffRows) {
     card.style.maxWidth = "100%";
     card.innerHTML = `
       <h3>${cfg.label}</h3>
-      <p class="subtitle">Current name: <strong>${displayName}</strong></p>
+      <p class="subtitle">Current name: <strong>${escHtml(displayName)}</strong></p>
       <label>New display name <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
-      <input type="text" class="staff-name-input" placeholder="${displayName}" />
+      <input type="text" class="staff-name-input" placeholder="${escHtml(displayName)}" />
       <label>New PIN <span style="font-weight:400;color:var(--text-muted);">(optional, 4 digits)</span></label>
       <input type="text" inputmode="numeric" maxlength="4" class="staff-pin-input" placeholder="••••" />
       <div class="status-line save-status" style="display:none;"></div>
@@ -956,7 +996,7 @@ function renderStaffList(staffRows) {
       saveBtn.textContent = "Save";
 
       if (error) {
-        statusEl.textContent = "Save failed — try again.";
+        statusEl.textContent = error.message ? "Couldn't save: " + error.message : "Save failed — try again.";
         statusEl.className = "status-line save-status error";
         statusEl.style.display = "block";
         return;
@@ -1035,21 +1075,21 @@ function renderTeamMembersList(members) {
           .map(
             (dept) => `
         <div class="card" style="margin-bottom:16px; max-width:100%;">
-          <h3>${dept}</h3>
+          <h3>${escHtml(dept)}</h3>
           ${byDept[dept]
             .map(
               (name) => `
             <div class="team-member-row">
               <div class="team-member-display">
-                <span>${name}</span>
+                <span>${escHtml(name)}</span>
                 <div class="team-member-actions">
-                  <button class="btn-edit-member" data-dept="${dept}" data-name="${name}">Edit</button>
-                  <button class="btn-remove-member" data-dept="${dept}" data-name="${name}">Remove</button>
+                  <button class="btn-edit-member" data-dept="${escHtml(dept)}" data-name="${escHtml(name)}">Edit</button>
+                  <button class="btn-remove-member" data-dept="${escHtml(dept)}" data-name="${escHtml(name)}">Remove</button>
                 </div>
               </div>
               <div class="team-member-edit-form" style="display:none;">
                 <label>Name</label>
-                <input type="text" class="edit-name-input" value="${name}" />
+                <input type="text" class="edit-name-input" value="${escHtml(name)}" />
                 <label>Department</label>
                 <select class="edit-dept-select"></select>
                 <input type="text" class="edit-dept-new-input" placeholder="New department name" style="display:none;" />
@@ -1076,7 +1116,7 @@ function renderTeamMembersList(members) {
 
       const deptSelect = form.querySelector(".edit-dept-select");
       deptSelect.innerHTML =
-        deptNames.map((d) => `<option value="${d}" ${d === btn.dataset.dept ? "selected" : ""}>${d}</option>`).join("") +
+        deptNames.map((d) => `<option value="${escHtml(d)}" ${d === btn.dataset.dept ? "selected" : ""}>${escHtml(d)}</option>`).join("") +
         '<option value="__new__">+ New Department</option>';
 
       const newDeptInput = form.querySelector(".edit-dept-new-input");
@@ -1165,7 +1205,7 @@ function populateDeptDropdown(members) {
   const depts = [...new Set(members.map((m) => m.department))];
 
   select.innerHTML =
-    depts.map((d) => `<option value="${d}">${d}</option>`).join("") +
+    depts.map((d) => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join("") +
     '<option value="__new__">+ New Department</option>';
 
   syncNewDeptInputVisibility();
@@ -1360,7 +1400,7 @@ function generateAndPrintReport() {
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
           .map((r) => {
             const date = new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-            const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+            const esc = escHtml;
             return `<tr><td>${date}</td><td>${esc(r.guest_name || "Anonymous")}</td><td>${esc(branchMap[r.branch_id] || "")} · ${esc(roomMap[r.room_id] || "?")}</td><td>${r.nps}</td><td>${esc(r.guest_contact || "–")}</td></tr>`;
           })
           .join("")}
@@ -1452,9 +1492,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("date-from").addEventListener("change", renderDashboard);
   document.getElementById("date-to").addEventListener("change", renderDashboard);
 
+  // Reloading drops every guest name, comment and the PIN from memory and the page.
   document.getElementById("dashboard-logout-btn").addEventListener("click", () => {
     mgmtState.pin = null;
-    showView("view-mgmt-pin");
+    window.location.reload();
   });
   document.getElementById("staff-settings-btn").addEventListener("click", openStaffView);
   document.getElementById("staff-back-btn").addEventListener("click", () => showView("view-dashboard"));

@@ -9,6 +9,7 @@ const RATING_CATEGORIES = [
   { key: "housekeeping_rating", label: "Housekeeping / Room Cleanliness", required: true },
   { key: "room_comfort_rating", label: "Room Comfort", hint: "Bed, temperature, noise, condition", required: true },
   { key: "facilities_rating", label: "Facilities & Amenities", required: false },
+  { key: "wifi_rating", label: "Wifi Connection and Speed", required: false },
   { key: "value_rating", label: "Value for Money", required: false },
   { key: "overall_rating", label: "Overall Stay Experience", required: false },
 ];
@@ -335,6 +336,7 @@ async function submitFeedback() {
     housekeeping_rating: state.ratings.housekeeping_rating,
     room_comfort_rating: state.ratings.room_comfort_rating,
     facilities_rating: state.ratings.facilities_rating,
+    wifi_rating: state.ratings.wifi_rating,
     value_rating: state.ratings.value_rating,
     overall_rating: state.ratings.overall_rating,
     nps: state.npsAnswered ? state.npsValue : null,
@@ -346,9 +348,14 @@ async function submitFeedback() {
   };
 
   let { error } = await db.from("feedback").insert(payload);
-  if (error && /source/i.test(error.message || "")) {
-    const { source, ...payloadWithoutSource } = payload;
-    ({ error } = await db.from("feedback").insert(payloadWithoutSource));
+  // If the database doesn't have one of the newer optional columns yet, send the
+  // response without it rather than losing the guest's feedback.
+  for (const column of ["wifi_rating", "source"]) {
+    const message = (error && error.message) || "";
+    if (message.includes("'" + column + "'") || message.includes('"' + column + '"')) {
+      delete payload[column];
+      ({ error } = await db.from("feedback").insert(payload));
+    }
   }
 
   if (error) {
@@ -364,7 +371,8 @@ async function submitFeedback() {
       feedback_id: feedbackId,
       team_member_id: teamMemberId,
     }));
-    await db.from("feedback_mentions").insert(rows);
+    const { error: mentionError } = await db.from("feedback_mentions").insert(rows);
+    if (mentionError) console.warn("Staff mentions were not saved:", mentionError.message);
   }
 
   submitBtn.disabled = false;

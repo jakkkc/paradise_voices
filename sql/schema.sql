@@ -3,11 +3,14 @@
 -- This file reflects the CURRENT, up-to-date database — every fix made
 -- along the way (room categories, staff functions, etc.) is folded in.
 --
--- Run this only against a FRESH/EMPTY Supabase project — it uses
--- `create table`, which fails if the tables already exist. Your live
--- project already has all of this applied; this file exists so you
--- could rebuild the database from scratch if you ever needed to
--- (new Supabase project, disaster recovery, etc).
+-- HOW TO USE THIS FILE
+--   * New/empty Supabase project: run the whole file once.
+--   * Existing project: do NOT run the whole file (the base tables already
+--     exist, so it stops at the first line). Run only the single block you
+--     need, e.g. the "Resolved feedback" block or the "PIN safety" block at
+--     the bottom. Those blocks are safe to run more than once.
+--   * The loyalty stage 2 and 3 functions (desk, redeem, overview, export)
+--     live only in the live database; they are not in this file yet.
 -- ============================================================
 
 create extension if not exists pgcrypto;
@@ -683,5 +686,58 @@ $$;
 
 grant execute on function resolve_feedback(text, uuid, text) to anon;
 grant execute on function reopen_feedback(text, uuid) to anon;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================
+-- PIN safety
+-- Two logins sharing one PIN made verify_pin() return two rows, so the
+-- app could pick the wrong role. This stops a PIN being reused and makes
+-- sure it is exactly 4 digits. Safe to run more than once.
+-- ============================================================
+
+create or replace function update_staff_credentials(
+  input_mgmt_pin text,
+  target_role_key text,
+  new_pin text default null,
+  new_display_name text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform assert_management(input_mgmt_pin);
+
+  if new_pin is not null then
+    if new_pin !~ '^[0-9]{4}$' then
+      raise exception 'A PIN must be exactly 4 digits';
+    end if;
+    if exists (select 1 from staff_roles where pin = new_pin and role_key <> target_role_key) then
+      raise exception 'That PIN is already used by another login. Choose a different one.';
+    end if;
+  end if;
+
+  update staff_roles
+  set pin = coalesce(new_pin, pin),
+      display_name = coalesce(new_display_name, display_name)
+  where role_key = target_role_key;
+end;
+$$;
+
+grant execute on function update_staff_credentials(text, text, text, text) to anon;
+
+notify pgrst, 'reload schema';
+
+-- ============================================================
+-- Wifi connection and speed rating
+-- Optional 1-5 star rating, like Facilities and Value. Older feedback
+-- simply has no Wifi score. Safe to run more than once.
+-- ============================================================
+
+alter table feedback
+  add column if not exists wifi_rating smallint
+  check (wifi_rating is null or wifi_rating between 1 and 5);
 
 notify pgrst, 'reload schema';

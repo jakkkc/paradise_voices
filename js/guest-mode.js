@@ -76,6 +76,7 @@ async function initGuestSelfMode() {
       .select("id, room_number")
       .eq("branch_id", branch.id)
       .eq("room_number", guestSelfRoom)
+      .eq("active", true)
       .maybeSingle();
 
     if (roomError || !room) {

@@ -531,14 +531,6 @@ input[type="range"] {
   margin: 0 auto;
 }
 
-.stat-grid-compact .stat-card {
-  padding: 12px;
-}
-
-.stat-grid-compact .stat-value {
-  font-size: 1.4rem;
-}
-
 .team-member-row {
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
@@ -856,12 +848,6 @@ input[type="range"] {
   color: var(--text-muted);
 }
 
-.comment-meta {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
 .empty-note {
   color: var(--text-muted);
   font-size: 0.9rem;
@@ -941,7 +927,7 @@ input[type="range"] {
 }
 
 #print-report .stat-grid:not(.icon-stat-grid) {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
 }
 
 #print-report .stat-grid .stat-card {
@@ -955,19 +941,6 @@ input[type="range"] {
 #print-report, #print-report * {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
-}
-
-#print-report .report-comment {
-  padding: 10px 0;
-  border-bottom: 1px solid #eee;
-  font-size: 0.9rem;
-  page-break-inside: avoid;
-}
-
-#print-report .report-comment-meta {
-  font-size: 0.78rem;
-  color: #666;
-  margin-bottom: 4px;
 }
 
 @media print {
@@ -1035,10 +1008,6 @@ input[type="range"] {
   .referral-bar-name {
     width: 74px;
     font-size: 0.8rem;
-  }
-
-  .comment-meta {
-    line-height: 1.4;
   }
 
   .filter-bar {
