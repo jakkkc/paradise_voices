@@ -1667,3 +1667,215 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Management top bar and tabs ---- */
+
+.mgmt-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.mgmt-nav,
+.mgmt-actions {
+  display: none;
+}
+
+.mgmt-in .app-header {
+  justify-content: flex-start;
+  padding: 8px 16px;
+}
+
+.mgmt-in .app-header img {
+  height: 32px;
+}
+
+.mgmt-in .mgmt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+#mgmt-updated {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.mgmt-actions button {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--cream);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--cream);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.mgmt-in .mgmt-nav {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  overflow-x: auto;
+  background: var(--brown-soft);
+}
+
+.mgmt-nav button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--cream);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.mgmt-nav button[aria-current] {
+  border-bottom-color: var(--cream);
+  font-weight: 600;
+}
+
+.nav-badge {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--danger);
+  color: var(--white);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.mgmt-alert {
+  padding: 8px 16px;
+  background: var(--danger);
+  color: var(--white);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.sticky-tools {
+  position: sticky;
+  top: var(--mgmt-top, 0px);
+  z-index: 10;
+  padding-top: 8px;
+  background: var(--white);
+}
+
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.tab-btn[aria-selected="true"] {
+  color: var(--terracotta-dark);
+  border-bottom-color: var(--terracotta);
+}
+
+/* Hidden tabs keep their width: charts drawn at zero size would print blank. */
+.tab-panel:not(.active) {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.tab-panel > .section-title:first-child {
+  margin-top: 8px;
+}
+
+#view-loyalty:not([data-tab="settings"]) #loyalty-save-btn,
+#view-loyalty[data-tab="settings"] #lo-tools {
+  display: none;
+}
+
+.attention-banner {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--danger);
+  font-weight: 600;
+  text-align: left;
+}
+
+[data-go] {
+  cursor: pointer;
+}
+
+.stat-card[data-go]:hover,
+.icon-stat-card[data-go]:hover {
+  border-color: var(--terracotta);
+}
+
+.leaderboard-row[data-go]:hover {
+  background: var(--cream);
+}
+
+[data-go]:focus-visible,
+.tab-btn:focus-visible,
+.mgmt-nav button:focus-visible {
+  outline: 2px solid var(--terracotta);
+  outline-offset: -2px;
+}
+
+.stat-delta {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.stat-delta.up {
+  color: var(--success);
+}
+
+.stat-delta.down {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .mgmt-in .app-header .brand-name {
+    display: none;
+  }
+
+  .sticky-tools .filter-bar {
+    flex-flow: row wrap;
+  }
+
+  .sticky-tools .filter-bar select {
+    flex: 1;
+    min-width: 0;
+    width: auto !important;
+    padding: 8px 10px;
+  }
+
+  #custom-date-range {
+    flex: 1 0 100%;
+    flex-direction: row;
+  }
+
+  #custom-date-range input[type="date"] {
+    flex: 1;
+    min-width: 0;
+    padding: 8px;
+  }
+}

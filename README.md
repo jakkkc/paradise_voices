@@ -22,6 +22,7 @@ js/paper-entry.js                One-page paper form entry for reception (tempor
 js/dashboard.js                  Analytics, staff settings, downloadable report
 js/dashboard-feedback.js         "Feedback" page: filters, resolve / reopen, CSV
 js/dashboard-qr.js               QR code sheet (A6, four per A4)
+js/dashboard-nav.js              Management top bar, tabs, refresh, needs-attention count
 js/dashboard-loyalty.js          Loyalty settings
 js/dashboard-loyalty-overview.js Loyalty overview, corrections, CSV
 assets/                          Logo + app icons

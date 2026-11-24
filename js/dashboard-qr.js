@@ -56,7 +56,6 @@ function ensureQrView() {
     <input type="text" id="qr-base-url" placeholder="https://your-app.vercel.app/" />
     <div id="qr-warning" class="status-line error" style="display:none;"></div>
     <div id="qr-sheet"></div>
-    <button class="btn-link" id="qr-back-btn">Back to Analytics</button>
   `;
   document.querySelector(".app-main").appendChild(view);
 }
@@ -201,7 +200,6 @@ function printQrSheet() {
 document.addEventListener("DOMContentLoaded", () => {
   ensureQrView();
   document.getElementById("qr-codes-btn").addEventListener("click", openQrView);
-  document.getElementById("qr-back-btn").addEventListener("click", () => showView("view-dashboard"));
   document.getElementById("qr-print-btn").addEventListener("click", printQrSheet);
   document.getElementById("qr-base-url").addEventListener("change", buildQrSheet);
 });

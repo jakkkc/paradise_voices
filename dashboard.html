@@ -15,10 +15,25 @@
 </head>
 <body>
   <div id="app">
+    <div class="mgmt-top" id="mgmt-top">
     <header class="app-header">
       <img src="assets/logo.png" alt="Hunters Paradise logo" />
       <span class="brand-name">Paradise Voices — Management</span>
+      <div class="mgmt-actions">
+        <span id="mgmt-updated"></span>
+        <button type="button" id="refresh-btn">Refresh</button>
+        <button type="button" id="dashboard-logout-btn">Log out</button>
+      </div>
     </header>
+    <nav class="mgmt-nav" id="mgmt-nav" aria-label="Management pages">
+      <button type="button" id="analytics-btn">Analytics</button>
+      <button type="button" id="feedback-btn">Feedback <span class="nav-badge" id="attention-badge" style="display:none;"></span></button>
+      <button type="button" id="loyalty-btn">Loyalty</button>
+      <button type="button" id="qr-codes-btn">QR Codes</button>
+      <button type="button" id="staff-settings-btn">Staff Settings</button>
+    </nav>
+    <div id="dashboard-load-error" class="mgmt-alert" role="alert" style="display:none;"></div>
+    </div>
 
     <main class="app-main dashboard-main">
 
@@ -54,17 +69,10 @@
       <div id="view-dashboard" class="view dashboard-wrap">
         <div class="dashboard-header">
           <h2 style="margin:0;">Analytics</h2>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <button class="btn btn-secondary" id="feedback-btn" style="width:auto; padding:10px 18px;">Feedback</button>
-            <button class="btn btn-secondary" id="qr-codes-btn" style="width:auto; padding:10px 18px;">QR Codes</button>
-            <button class="btn btn-secondary" id="loyalty-btn" style="width:auto; padding:10px 18px;">Loyalty</button>
-            <button class="btn btn-secondary" id="staff-settings-btn" style="width:auto; padding:10px 18px;">Staff Settings</button>
-            <button class="btn btn-primary" id="download-report-btn" style="width:auto; padding:10px 18px;">Download Report</button>
-          </div>
+          <button class="btn btn-primary" id="download-report-btn" style="width:auto; padding:10px 18px;">Download Report</button>
         </div>
 
-        <div id="dashboard-load-error" class="status-line error" style="display:none; margin-top:0; margin-bottom:12px;"></div>
-
+        <div class="sticky-tools">
         <div class="filter-bar">
           <select id="branch-filter">
             <option value="all">All Branches</option>
@@ -81,7 +89,11 @@
             <input type="date" id="date-to" />
           </div>
         </div>
+          <div class="tab-bar"></div>
+        </div>
 
+        <section class="tab-panel" data-tab="overview" data-label="Overview">
+          <button type="button" class="attention-banner" id="attention-banner" style="display:none;"></button>
         <h3 class="section-title" id="icon-stat-title">Selected Period</h3>
         <div class="stat-grid icon-stat-grid" id="icon-stat-row"></div>
 
@@ -89,7 +101,9 @@
         <div class="stat-grid" id="stat-grid"></div>
 
         <div class="overview-card" id="alltime-panel"></div>
+        </section>
 
+        <section class="tab-panel" data-tab="trends" data-label="Trends">
         <h3 class="section-title" id="trend-title"></h3>
         <div class="chart-wrap" id="trend-chart-canvas-wrap"><canvas id="trend-chart"></canvas></div>
         <p id="trend-chart-empty" class="empty-note" style="display:none;">No data in this period yet.</p>
@@ -104,15 +118,14 @@
         <div class="chart-wrap" id="nps-trend-canvas-wrap"><canvas id="nps-trend-chart"></canvas></div>
         <p id="nps-trend-empty" class="empty-note" style="display:none;">No NPS responses in this period yet.</p>
 
-        <h3 class="section-title bad-title" id="detractor-title"></h3>
-        <div id="detractor-list"></div>
-
         <h3 class="section-title">Branch Comparison</h3>
         <div class="chart-wrap"><canvas id="branch-comparison-chart"></canvas></div>
 
         <h3 class="section-title">Room Category Performance</h3>
         <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+        </section>
 
+        <section class="tab-panel" data-tab="guests" data-label="Guests &amp; Staff">
         <h3 class="section-title" id="leaderboard-title"></h3>
         <div id="leaderboard-list"></div>
 
@@ -121,17 +134,22 @@
 
         <h3 class="section-title">How Feedback Was Collected</h3>
         <div id="source-breakdown"></div>
+        </section>
+
+        <section class="tab-panel" data-tab="comments" data-label="Comments">
+        <h3 class="section-title bad-title" id="bad-comments-title"></h3>
+        <div id="bad-comments-list"></div>
+
+        <h3 class="section-title bad-title" id="detractor-title"></h3>
+        <div id="detractor-list"></div>
 
         <h3 class="section-title good-title" id="good-comments-title"></h3>
         <div id="good-comments-list"></div>
 
-        <h3 class="section-title bad-title" id="bad-comments-title"></h3>
-        <div id="bad-comments-list"></div>
-
         <h3 class="section-title resolved-title" id="resolved-comments-title"></h3>
         <div id="resolved-comments-list"></div>
+        </section>
 
-        <button class="btn-link" id="dashboard-logout-btn">Log out</button>
       </div>
 
       <!-- Staff Settings -->
@@ -139,20 +157,9 @@
         <div class="dashboard-header">
           <h2 style="margin:0;">Staff Settings</h2>
         </div>
-        <div id="staff-list"></div>
+        <div class="tab-bar"></div>
 
-        <h3 class="section-title">Paper Feedback Entry</h3>
-        <div class="card" style="margin-bottom:16px; max-width:100%;">
-          <p class="empty-note">While this is on, reception at both branches can type in paper forms under the date written on them.</p>
-          <p style="margin:12px 0;">Currently: <strong id="paper-toggle-state">…</strong></p>
-          <button class="btn btn-primary" id="paper-toggle-btn" disabled>Switch on</button>
-          <div id="paper-toggle-msg" class="status-line" style="display:none;"></div>
-        </div>
-
-        <h3 class="section-title">Team Members</h3>
-        <p class="empty-note" style="margin-bottom:16px;">Shown to guests in "Who Made Your Stay Special." Changes apply to both branches.</p>
-        <div id="team-members-list"></div>
-
+        <section class="tab-panel" data-tab="team" data-label="Team">
         <div class="card" style="margin-bottom:16px; max-width:100%;">
           <h3>Add Staff Member</h3>
           <label for="new-member-dept-select">Department</label>
@@ -164,7 +171,25 @@
           <button class="btn btn-primary" id="add-member-btn">Add</button>
         </div>
 
-        <button class="btn-link" id="staff-back-btn">Back to Analytics</button>
+        <h3 class="section-title">Team Members</h3>
+        <p class="empty-note" style="margin-bottom:16px;">Shown to guests in "Who Made Your Stay Special." Changes apply to both branches.</p>
+        <div id="team-members-list"></div>
+        </section>
+
+        <section class="tab-panel" data-tab="pins" data-label="PINs">
+        <div id="staff-list"></div>
+        </section>
+
+        <section class="tab-panel" data-tab="paper" data-label="Paper entry">
+        <h3 class="section-title">Paper Feedback Entry</h3>
+        <div class="card" style="margin-bottom:16px; max-width:100%;">
+          <p class="empty-note">While this is on, reception at both branches can type in paper forms under the date written on them.</p>
+          <p style="margin:12px 0;">Currently: <strong id="paper-toggle-state">…</strong></p>
+          <button class="btn btn-primary" id="paper-toggle-btn" disabled>Switch on</button>
+          <div id="paper-toggle-msg" class="status-line" style="display:none;"></div>
+        </div>
+        </section>
+
       </div>
 
     </main>
@@ -181,5 +206,6 @@
   <script src="js/dashboard-loyalty-overview.js"></script>
   <script src="js/dashboard-qr.js"></script>
   <script src="js/dashboard-feedback.js"></script>
+  <script src="js/dashboard-nav.js"></script>
 </body>
 </html>

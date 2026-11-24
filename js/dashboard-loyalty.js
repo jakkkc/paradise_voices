@@ -39,8 +39,10 @@ function ensureLoyaltyView() {
       <h2 style="margin:0;">Loyalty Programme</h2>
       <button class="btn btn-primary" id="loyalty-save-btn" style="width:auto; padding:10px 18px;">Save Settings</button>
     </div>
+    <div class="tab-bar"></div>
     <div id="loyalty-status" class="status-line" style="display:none; margin-top:0; margin-bottom:12px;"></div>
 
+    <section class="tab-panel" data-tab="settings" data-label="Settings">
     <h3 class="section-title">Earning Points</h3>
     <div class="card" style="max-width:100%; margin-bottom:16px;">
       <div class="loyalty-grid">
@@ -75,7 +77,7 @@ function ensureLoyaltyView() {
       <button class="btn btn-secondary" id="loyalty-add-reward" style="width:auto; padding:10px 18px; margin-top:12px;">+ Add Reward</button>
     </div>
 
-    <button class="btn-link" id="loyalty-back-btn">Back to Analytics</button>
+    </section>
   `;
   document.querySelector(".app-main").appendChild(view);
 }
@@ -259,7 +261,6 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureLoyaltyView();
 
   loyaltyEl("loyalty-btn").addEventListener("click", openLoyaltyView);
-  loyaltyEl("loyalty-back-btn").addEventListener("click", () => showView("view-dashboard"));
   loyaltyEl("loyalty-save-btn").addEventListener("click", saveLoyaltySettings);
 
   loyaltyEl("view-loyalty").addEventListener("input", updateLoyaltyPreview);

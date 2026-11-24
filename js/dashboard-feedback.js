@@ -54,7 +54,14 @@ function ensureFeedbackView() {
         <div><label for="fb-category">Room category</label><select id="fb-category"></select></div>
         <div><label for="fb-room">Room</label><select id="fb-room"></select></div>
         <div>
-          <label for="fb-rating">Average rating</label>
+          <label for="fb-field">Rating category</label>
+          <select id="fb-field">
+            <option value="">All (average)</option>
+            ${RATING_FIELDS.map((f) => `<option value="${f.key}">${fbEsc(f.label)}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <label for="fb-rating">Rating</label>
           <select id="fb-rating">
             <option value="">Any</option>
             <option value="high">4 stars and above</option>
@@ -121,7 +128,6 @@ function ensureFeedbackView() {
     <div id="fb-list"></div>
     <button class="btn btn-secondary" id="fb-more-btn" style="display:none;">Load more</button>
 
-    <button class="btn-link" id="fb-back-btn">Back to Analytics</button>
   `;
   document.querySelector(".app-main").appendChild(view);
 }
@@ -223,7 +229,15 @@ function fbSourceOf(row) {
   return row.source in SOURCE_LABELS ? row.source : "tablet"; // older responses have no source: they were tablet
 }
 
+// The score the rating filter and sort work on: one category if chosen,
+// otherwise the response's average.
+function fbScore(row) {
+  const field = fbEl("fb-field").value;
+  return field ? row[field] ?? null : compositeScore(row);
+}
+
 function fbFiltered() {
+  const field = fbEl("fb-field").value;
   const branch = fbEl("fb-branch").value;
   const category = fbEl("fb-category").value;
   const room = fbEl("fb-room").value;
@@ -250,8 +264,9 @@ function fbFiltered() {
     if (from && created < from) return false;
     if (to && created > to) return false;
 
+    if (field && fbScore(r) === null) return false;
     if (rating) {
-      const avg = compositeScore(r);
+      const avg = fbScore(r);
       if (avg === null) return false;
       if (rating === "high" && avg < 4) return false;
       if (rating === "mid" && (avg < 3 || avg >= 4)) return false;
@@ -293,10 +308,7 @@ function fbFiltered() {
 function fbSort(rows) {
   const sort = fbEl("fb-sort").value;
   const byDate = (a, b) => new Date(b.created_at) - new Date(a.created_at);
-  const score = (r) => {
-    const s = compositeScore(r);
-    return s === null ? null : s;
-  };
+  const score = fbScore;
   const sorted = [...rows];
   if (sort === "oldest") return sorted.sort((a, b) => -byDate(a, b));
   if (sort === "lowest" || sort === "highest") {
@@ -362,10 +374,13 @@ function fbCardHtml(row, lookups) {
 }
 
 function fbRenderSummary(rows) {
+  const field = RATING_FIELDS.find((f) => f.key === fbEl("fb-field").value);
   const nps = computeNps(rows);
   const cards = [
     { v: rows.length, l: rows.length === 1 ? "Feedback" : "Feedbacks" },
-    { v: formatAvg(pooledAverage(rows)), l: "Average rating" },
+    field
+      ? { v: formatAvg(average(rows, field.key)), l: field.label + " average" }
+      : { v: formatAvg(pooledAverage(rows)), l: "Average rating" },
     { v: nps ? nps.score : "–", l: `NPS (${nps ? nps.count : 0} resp.)` },
     { v: rows.filter((r) => r.comment).length, l: "With comments" },
     { v: rows.filter((r) => getBadTriggers(r).length > 0 && !isResolved(r)).length, l: "Need attention" },
@@ -411,7 +426,7 @@ function openFeedbackView() {
 }
 
 function fbResetFilters() {
-  ["fb-branch", "fb-category", "fb-room", "fb-rating", "fb-nps", "fb-sentiment", "fb-comment", "fb-staff", "fb-source"].forEach(
+  ["fb-branch", "fb-category", "fb-room", "fb-field", "fb-rating", "fb-nps", "fb-sentiment", "fb-comment", "fb-staff", "fb-source"].forEach(
     (id) => (fbEl(id).value = "")
   );
   fbEl("fb-date").value = "all";
@@ -468,7 +483,6 @@ document.addEventListener("DOMContentLoaded", () => {
   ensureFeedbackView();
 
   fbEl("feedback-btn").addEventListener("click", openFeedbackView);
-  fbEl("fb-back-btn").addEventListener("click", () => showView("view-dashboard"));
   fbEl("fb-reset-btn").addEventListener("click", fbResetFilters);
   fbEl("fb-download-btn").addEventListener("click", fbDownload);
   fbEl("fb-more-btn").addEventListener("click", () => {
@@ -494,7 +508,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fbEl("fb-custom-dates").style.display = e.target.value === "custom" ? "flex" : "none";
     refresh();
   });
-  ["fb-room", "fb-from", "fb-to", "fb-rating", "fb-nps", "fb-sentiment", "fb-comment", "fb-staff", "fb-source", "fb-sort"].forEach((id) =>
+  ["fb-room", "fb-from", "fb-to", "fb-field", "fb-rating", "fb-nps", "fb-sentiment", "fb-comment", "fb-staff", "fb-source", "fb-sort"].forEach((id) =>
     fbEl(id).addEventListener("change", refresh)
   );
   fbEl("fb-search").addEventListener("input", refresh);
@@ -503,6 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ---------- Resolve / reopen (used by the Analytics lists and this page) ----------
 
 function afterResolveChange() {
+  updateAttention();
   renderCommentGroups(periodFilteredRows());
   if (fbEl("view-feedback").classList.contains("active")) fbRender();
 }

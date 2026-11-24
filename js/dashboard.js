@@ -59,6 +59,7 @@ function localDayKey(iso) {
 function showView(id) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+  onMgmtView(id); // dashboard-nav.js
 }
 
 // ---------- PIN gate ----------
@@ -137,6 +138,8 @@ async function fetchAllRows(makeQuery, keyOf) {
   return { data: rows, error: null };
 }
 
+// Returns false if the feedback could not be loaded; whatever was already on
+// screen is then kept.
 async function loadDashboard() {
   const [
     { data: feedback, error: fbError },
@@ -158,24 +161,24 @@ async function loadDashboard() {
   ]);
 
   // A failed load used to show an empty dashboard with no explanation.
-  const errorEl = document.getElementById("dashboard-load-error");
-  if (errorEl) {
-    errorEl.textContent = fbError ? "Couldn't load the feedback. Check your connection and reload the page." : "";
-    errorEl.style.display = fbError ? "block" : "none";
-  }
+  setMgmtAlert(fbError ? "Couldn't load the latest feedback. Check your connection and press Refresh." : "");
 
-  mgmtState.feedback = fbError ? [] : feedback || [];
-  mgmtState.branches = branches || [];
-  mgmtState.rooms = rooms || [];
-  mgmtState.roomCategories = roomCategories || [];
-  mgmtState.mentions = mentionsError ? [] : mentions || [];
-  mgmtState.teamMembers = teamMembers || [];
+  if (!fbError) mgmtState.feedback = feedback || [];
+  if (branches) mgmtState.branches = branches;
+  if (rooms) mgmtState.rooms = rooms;
+  if (roomCategories) mgmtState.roomCategories = roomCategories;
+  if (!mentionsError) mgmtState.mentions = mentions || [];
+  if (teamMembers) mgmtState.teamMembers = teamMembers;
 
   populateBranchFilter();
+  updateAttention();
+  if (!fbError) markUpdated();
+  return !fbError;
 }
 
 function populateBranchFilter() {
   const select = document.getElementById("branch-filter");
+  const previous = select.value;
   select.innerHTML = '<option value="all">All Branches</option>';
   mgmtState.branches.forEach((b) => {
     const opt = document.createElement("option");
@@ -183,6 +186,7 @@ function populateBranchFilter() {
     opt.textContent = BRANCH_NAMES[b.code] || b.name;
     select.appendChild(opt);
   });
+  select.value = mgmtState.branches.some((b) => b.id === previous) ? previous : "all";
 }
 
 // ---------- Filtering ----------
@@ -232,6 +236,62 @@ function periodFilteredRows() {
 
 function dateOnlyFilteredRows() {
   return applyDateBounds(mgmtState.feedback);
+}
+
+// The period just before the chosen one, or null when there is nothing to
+// compare with (all time, or an unfinished custom range). `to` is exclusive.
+function getPreviousPeriod(now = new Date()) {
+  const filter = document.getElementById("date-filter").value;
+  const DAY = 24 * 60 * 60 * 1000;
+
+  if (filter === "7" || filter === "30") {
+    const days = Number(filter);
+    const to = new Date(now);
+    to.setDate(to.getDate() - days);
+    const from = new Date(now);
+    from.setDate(from.getDate() - 2 * days);
+    return { from, to, label: `vs previous ${days} days` };
+  }
+  if (filter === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(Math.min(from.getTime() + (now - start), start.getTime()));
+    return { from, to, label: "vs same days last month" };
+  }
+  if (filter === "custom") {
+    const { from: start, to: end } = getDateBounds();
+    if (!start || !end || end < start) return null;
+    const days = Math.round((end - start) / DAY);
+    const from = new Date(start);
+    from.setDate(from.getDate() - days);
+    return { from, to: start, label: `vs previous ${days === 1 ? "day" : days + " days"}` };
+  }
+  return null;
+}
+
+function previousPeriodRows() {
+  const period = getPreviousPeriod();
+  if (!period) return null;
+  const rows = branchFilteredRows().filter((r) => {
+    const created = new Date(r.created_at);
+    return created >= period.from && created < period.to;
+  });
+  return { rows, label: period.label };
+}
+
+// "▲ 0.2 vs previous 7 days". `previous` is what previousPeriodRows() returned
+// and `valueOf` reads the same figure from a set of rows (null = no answers).
+function deltaHtml(rows, previous, valueOf, decimals) {
+  if (!previous) return "";
+  const now = valueOf(rows);
+  const before = previous.rows.length ? valueOf(previous.rows) : null;
+  if (before === null) return '<div class="stat-delta">no earlier data</div>';
+  if (now === null) return "";
+  const diff = Number(now.toFixed(decimals)) - Number(before.toFixed(decimals));
+  const text = Math.abs(diff).toFixed(decimals);
+  const same = Number(text) === 0;
+  const cls = same ? "" : diff > 0 ? " up" : " down";
+  return `<div class="stat-delta${cls}">${same ? "no change" : (diff > 0 ? "▲ " : "▼ ") + text} ${previous.label}</div>`;
 }
 
 // ---------- Stats ----------
@@ -312,26 +372,28 @@ function renderDashboard() {
 
 function renderIconStatRow(rows) {
   const container = document.getElementById("icon-stat-row");
+  const previous = previousPeriodRows();
   const nps = computeNps(rows);
   const csat = computeCsat(rows);
   const repeatCount = rows.filter((r) => r.referral_source === "repeat_guest").length;
   const overallAvg = pooledAverage(rows);
 
   const cards = [
-    { icon: ICONS.chat, value: rows.length, label: "Total Feedback" },
-    { icon: ICONS.star, value: formatAvg(overallAvg), label: "Overall Avg" },
-    { icon: ICONS.thumbsUp, value: nps ? nps.score : "–", label: `NPS (${nps ? nps.count : 0} resp.)` },
-    { icon: ICONS.smiley, value: csat ? csat.pct + "%" : "–", label: `CSAT (${csat ? csat.count : 0} ratings)` },
-    { icon: ICONS.users, value: repeatCount, label: "Repeat Guests" },
+    { icon: ICONS.chat, value: rows.length, label: "Total Feedback", go: "period", of: (r) => r.length, dp: 0 },
+    { icon: ICONS.star, value: formatAvg(overallAvg), label: "Overall Avg", go: "period", of: pooledAverage, dp: 1 },
+    { icon: ICONS.thumbsUp, value: nps ? nps.score : "–", label: `NPS (${nps ? nps.count : 0} resp.)`, go: "lowest", of: (r) => computeNps(r)?.score ?? null, dp: 0 },
+    { icon: ICONS.smiley, value: csat ? csat.pct + "%" : "–", label: `CSAT (${csat ? csat.count : 0} ratings)`, go: "lowest", of: (r) => computeCsat(r)?.pct ?? null, dp: 1 },
+    { icon: ICONS.users, value: repeatCount, label: "Repeat Guests", of: (r) => r.filter((x) => x.referral_source === "repeat_guest").length, dp: 0 },
   ];
 
   container.innerHTML = cards
     .map(
       (c) => `
-      <div class="icon-stat-card">
+      <div class="icon-stat-card"${c.go ? ` data-go="${c.go}" role="button" tabindex="0"` : ""}>
         ${c.icon}
         <div class="icon-stat-value">${c.value}</div>
         <div class="icon-stat-label">${c.label}</div>
+        ${deltaHtml(rows, previous, c.of, c.dp)}
       </div>
     `
     )
@@ -341,11 +403,16 @@ function renderIconStatRow(rows) {
 function renderStatGrid(rows) {
   const grid = document.getElementById("stat-grid");
   grid.innerHTML = "";
+  const previous = previousPeriodRows();
 
   RATING_FIELDS.forEach((f) => {
     const card = document.createElement("div");
     card.className = "stat-card";
-    card.innerHTML = `<div class="stat-value">${formatAvg(average(rows, f.key))}</div><div class="stat-label">${f.label}</div>`;
+    card.innerHTML = `<div class="stat-value">${formatAvg(average(rows, f.key))}</div><div class="stat-label">${f.label}</div>${deltaHtml(rows, previous, (r) => average(r, f.key), 1)}`;
+    card.dataset.go = "field";
+    card.dataset.value = f.key;
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
     grid.appendChild(card);
   });
 }
@@ -733,6 +800,7 @@ function computeLeaderboard(rows) {
     const scores = fids.map((fid) => compositeScore(rowById[fid])).filter((v) => v !== null);
     const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     return {
+      known: !!member,
       name: member ? member.name : "Unknown",
       department: member ? member.department : "",
       mentions: fids.length,
@@ -760,7 +828,7 @@ function renderLeaderboard(rows) {
     .slice(0, 10)
     .map(
       (entry, idx) => `
-      <div class="leaderboard-row">
+      <div class="leaderboard-row"${entry.known ? ` data-go="staff" data-value="${escHtml(entry.name)}" role="button" tabindex="0"` : ""}>
         <span class="leaderboard-rank">${medals[idx] || idx + 1}</span>
         <span class="leaderboard-name">${escHtml(entry.name)} <span class="leaderboard-dept">(${escHtml(entry.department)})</span></span>
         <span class="leaderboard-mentions">${entry.mentions} mention${entry.mentions === 1 ? "" : "s"}</span>
@@ -1073,11 +1141,11 @@ async function togglePaperEntry() {
 }
 
 async function openStaffView() {
+  showView("view-staff"); // first, so a slow load can't pull you back from another page
   loadPaperToggle();
   const rows = await loadStaffRoles();
   renderStaffList(rows);
   await refreshTeamMembersUI();
-  showView("view-staff");
 }
 
 // ---------- Team Members (Front Office / Housekeeping / etc) ----------
@@ -1551,7 +1619,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   document.getElementById("staff-settings-btn").addEventListener("click", openStaffView);
   document.getElementById("paper-toggle-btn").addEventListener("click", togglePaperEntry);
-  document.getElementById("staff-back-btn").addEventListener("click", () => showView("view-dashboard"));
   document.getElementById("download-report-btn").addEventListener("click", generateAndPrintReport);
 
   // Decide the correct view BEFORE showing anything, so there's no

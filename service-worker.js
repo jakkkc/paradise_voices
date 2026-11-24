@@ -4,7 +4,7 @@
 // tablets getting stuck with a stale mix of old/new files after updates —
 // which is what caused the intermittent "works sometimes" bugs.
 
-const CACHE_NAME = "paradise-voices-v5";
+const CACHE_NAME = "paradise-voices-v6";
 
 const PRECACHE_URLS = [
   "index.html",
@@ -21,6 +21,7 @@ const PRECACHE_URLS = [
   "js/dashboard-loyalty-overview.js",
   "js/dashboard-qr.js",
   "js/dashboard-feedback.js",
+  "js/dashboard-nav.js",
   "assets/logo.png",
   "assets/icon-192.png",
   "assets/icon-512.png",

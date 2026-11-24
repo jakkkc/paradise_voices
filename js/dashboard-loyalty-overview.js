@@ -74,8 +74,7 @@ function ensureLoyaltyOverview() {
   anchor.insertAdjacentHTML(
     "afterend",
     `
-    <div id="loyalty-overview">
-      <h3 class="section-title">Overview</h3>
+    <div id="lo-tools">
       <div class="filter-bar" style="margin-bottom:14px;">
         <select id="lo-branch"><option value="">All branches</option></select>
         <select id="lo-period">
@@ -86,17 +85,23 @@ function ensureLoyaltyOverview() {
         </select>
       </div>
       <div id="lo-msg" class="status-line" style="display:none; margin-top:0; margin-bottom:12px;"></div>
+    </div>
+
+    <section class="tab-panel" id="loyalty-overview" data-tab="overview" data-label="Overview">
       <div class="stat-grid" id="lo-stats"></div>
       <p class="empty-note" id="lo-note" style="margin-top:8px;"></p>
 
       <h3 class="section-title">Large Redemptions</h3>
       <div id="lo-flagged"></div>
 
-      <h3 class="section-title">Top Members</h3>
-      <div class="card" style="max-width:100%;" id="lo-top"></div>
-
       <h3 class="section-title">Recent Activity</h3>
       <div class="card" style="max-width:100%;" id="lo-recent"></div>
+
+    </section>
+
+    <section class="tab-panel" data-tab="members" data-label="Members">
+      <h3 class="section-title">Top Members</h3>
+      <div class="card" style="max-width:100%;" id="lo-top"></div>
 
       <h3 class="section-title">Correct a Member's Points</h3>
       <div class="card" style="max-width:100%;">
@@ -132,8 +137,7 @@ function ensureLoyaltyOverview() {
         <div id="lo-dl-msg" class="status-line" style="display:none;"></div>
       </div>
 
-      <h3 class="section-title">Settings</h3>
-    </div>
+    </section>
   `
   );
 }
