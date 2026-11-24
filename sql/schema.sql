@@ -741,3 +741,222 @@ alter table feedback
   check (wifi_rating is null or wifi_rating between 1 and 5);
 
 notify pgrst, 'reload schema';
+
+-- ============================================================
+-- Paper feedback entry (temporary)
+-- Lets reception type in paper forms under the date written on them.
+-- Management switches it on and off in Staff Settings.
+-- Safe to run more than once.
+-- ============================================================
+
+begin;
+
+-- Earlier blocks' columns, in case they have not been run yet.
+alter table feedback add column if not exists wifi_rating smallint
+  check (wifi_rating is null or wifi_rating between 1 and 5);
+alter table feedback add column if not exists resolved_at timestamptz;
+alter table feedback add column if not exists resolved_note text;
+
+-- When a paper form was actually typed in (empty for normal responses).
+alter table feedback add column if not exists entered_at timestamptz;
+
+-- Allow 'paper' as a source. The old rule is found by its column, so its
+-- name does not matter (and the referral_source rule is left alone).
+do $$
+declare
+  con record;
+begin
+  for con in
+    select c.conname
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attname = 'source'
+    where c.conrelid = 'feedback'::regclass
+      and c.contype = 'c'
+      and c.conkey = array[a.attnum]
+  loop
+    execute format('alter table feedback drop constraint %I', con.conname);
+  end loop;
+end;
+$$;
+
+alter table feedback add constraint feedback_source_check
+  check (source in ('tablet','room_qr','reception_qr','paper'));
+
+-- Normal responses are always dated now and start unresolved. Only
+-- submit_paper_feedback() below can save an earlier date, so the switch
+-- cannot be bypassed.
+drop policy if exists "anyone can submit feedback" on feedback;
+create policy "anyone can submit feedback" on feedback for insert
+  with check (
+    source <> 'paper' and entered_at is null and created_at = now()
+    and resolved_at is null and resolved_note is null
+  );
+
+-- Paper forms from one day share a timestamp. Sorting by id as well keeps
+-- the dashboard's page-by-page loading from skipping any of them.
+create or replace function get_management_feedback(input_pin text)
+returns setof feedback
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where role_key = 'management' and pin = input_pin) then
+    raise exception 'Invalid management PIN';
+  end if;
+  return query select * from feedback order by created_at desc, id;
+end;
+$$;
+
+-- ---- The on/off switch (always exactly one row, off at first) ----
+create table if not exists paper_entry_settings (
+  id boolean primary key default true check (id),
+  enabled boolean not null default false
+);
+
+insert into paper_entry_settings (id) values (true) on conflict (id) do nothing;
+
+alter table paper_entry_settings enable row level security;
+
+create or replace function paper_entry_status(input_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from staff_roles where pin = input_pin) then
+    raise exception 'Invalid PIN';
+  end if;
+  return coalesce((select enabled from paper_entry_settings), false);
+end;
+$$;
+
+create or replace function set_paper_entry_enabled(input_mgmt_pin text, input_enabled boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform assert_management(input_mgmt_pin);
+  update paper_entry_settings set enabled = coalesce(input_enabled, false) where id;
+  return coalesce(input_enabled, false);
+end;
+$$;
+
+-- Saves one paper form. Returns 'saved', 'already_saved' (same form sent
+-- twice) or 'duplicate' (looks like one already entered; send force to save).
+create or replace function submit_paper_feedback(input_pin text, payload jsonb)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_branch uuid;
+  v_id uuid := (payload->>'id')::uuid;
+  v_room uuid := (payload->>'room_id')::uuid;
+  v_date date := (payload->>'visit_date')::date;
+  v_today date := (now() at time zone 'Africa/Nairobi')::date;
+  v_created timestamptz;
+  v_comment text := nullif(btrim(payload->>'comment'), '');
+  v_mentions uuid[];
+begin
+  select sr.branch_id into v_branch
+  from staff_roles sr
+  where sr.pin = input_pin and sr.role_key <> 'management' and sr.branch_id is not null
+  limit 1;
+  if v_branch is null then
+    raise exception 'Invalid reception PIN';
+  end if;
+
+  if not coalesce((select enabled from paper_entry_settings), false) then
+    raise exception 'Paper feedback entry is switched off';
+  end if;
+  if v_id is null then
+    raise exception 'Missing form id';
+  end if;
+  if exists (select 1 from feedback where id = v_id and source = 'paper' and branch_id = v_branch) then
+    return 'already_saved';
+  end if;
+  if v_date is null then
+    raise exception 'Enter the date on the paper';
+  end if;
+  if v_date > v_today then
+    raise exception 'The date cannot be in the future';
+  end if;
+  if v_date < (v_today - interval '2 years')::date then
+    raise exception 'The date cannot be more than 2 years ago';
+  end if;
+  if v_room is null or not exists (select 1 from rooms where id = v_room and branch_id = v_branch) then
+    raise exception 'Choose a room in this branch';
+  end if;
+
+  select coalesce(array_agg(distinct m::uuid), '{}') into v_mentions
+  from jsonb_array_elements_text(coalesce(payload->'mentions', '[]'::jsonb)) as m;
+
+  if (select count(*) from team_members where id = any(v_mentions) and branch_id = v_branch)
+     <> cardinality(v_mentions) then
+    raise exception 'The staff list has changed. Re-enter your PIN and try again';
+  end if;
+
+  -- Noon in Nairobi, but never later than the present moment.
+  v_created := least((v_date + time '12:00') at time zone 'Africa/Nairobi', now());
+
+  if not coalesce((payload->>'force')::boolean, false) and exists (
+    select 1 from feedback f
+    where f.source = 'paper'
+      and f.room_id = v_room
+      and (f.created_at at time zone 'Africa/Nairobi')::date = v_date
+      and f.front_office_rating is not distinct from (payload->>'front_office_rating')::smallint
+      and f.housekeeping_rating is not distinct from (payload->>'housekeeping_rating')::smallint
+      and f.room_comfort_rating is not distinct from (payload->>'room_comfort_rating')::smallint
+      and f.facilities_rating is not distinct from (payload->>'facilities_rating')::smallint
+      and f.wifi_rating is not distinct from (payload->>'wifi_rating')::smallint
+      and f.value_rating is not distinct from (payload->>'value_rating')::smallint
+      and f.overall_rating is not distinct from (payload->>'overall_rating')::smallint
+      and f.comment is not distinct from v_comment
+  ) then
+    return 'duplicate';
+  end if;
+
+  insert into feedback (
+    id, created_at, entered_at, source, branch_id, room_id,
+    front_office_rating, housekeeping_rating, room_comfort_rating,
+    facilities_rating, wifi_rating, value_rating, overall_rating,
+    nps, referral_source, comment, guest_name, guest_contact
+  ) values (
+    v_id, v_created, now(), 'paper', v_branch, v_room,
+    (payload->>'front_office_rating')::smallint,
+    (payload->>'housekeeping_rating')::smallint,
+    (payload->>'room_comfort_rating')::smallint,
+    (payload->>'facilities_rating')::smallint,
+    (payload->>'wifi_rating')::smallint,
+    (payload->>'value_rating')::smallint,
+    (payload->>'overall_rating')::smallint,
+    (payload->>'nps')::smallint,
+    payload->>'referral_source',
+    v_comment,
+    nullif(btrim(payload->>'guest_name'), ''),
+    nullif(btrim(payload->>'guest_contact'), '')
+  );
+
+  insert into feedback_mentions (feedback_id, team_member_id)
+  select v_id, m from unnest(v_mentions) as m;
+
+  return 'saved';
+end;
+$$;
+
+grant execute on function paper_entry_status(text) to anon;
+grant execute on function set_paper_entry_enabled(text, boolean) to anon;
+grant execute on function submit_paper_feedback(text, jsonb) to anon;
+
+commit;
+
+notify pgrst, 'reload schema';
+
+-- Check: this should list exactly ONE policy for feedback.
+select policyname, cmd, with_check from pg_policies
+where schemaname = 'public' and tablename = 'feedback' and cmd in ('INSERT', 'ALL');

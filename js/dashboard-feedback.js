@@ -97,6 +97,7 @@ function ensureFeedbackView() {
             <option value="tablet">Reception tablet</option>
             <option value="room_qr">Room QR code</option>
             <option value="reception_qr">Reception QR code</option>
+            <option value="paper">Paper form</option>
           </select>
         </div>
         <div>
@@ -329,7 +330,11 @@ function fbCardHtml(row, lookups) {
   const badKeys = new Set(triggers.map((t) => t.key));
   const room = lookups.roomMap[row.room_id];
   const roomLabel = room ? room.room_number : "Unknown room";
-  const date = new Date(row.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  const isPaper = fbSourceOf(row) === "paper";
+  // A paper form only has a date, so don't show the stand-in time of noon.
+  const date = isPaper
+    ? new Date(row.created_at).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "Africa/Nairobi" })
+    : new Date(row.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   const servedBy = fb.mentionNames[row.id] || [];
 
   const guest = [row.guest_name, row.guest_contact].filter(Boolean).map(fbEsc).join(" · ");
@@ -337,6 +342,10 @@ function fbCardHtml(row, lookups) {
   if (servedBy.length) metaParts.push(`Served by ${fbEsc(servedBy.join(", "))}`);
   if (guest) metaParts.push(guest);
   metaParts.push(fbEsc(SOURCE_LABELS[fbSourceOf(row)]));
+  if (isPaper && row.entered_at) {
+    const entered = new Date(row.entered_at).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "Africa/Nairobi" });
+    metaParts.push("Entered on " + fbEsc(entered));
+  }
 
   return `
     <div class="feedback-card ${type}">
@@ -422,13 +431,13 @@ function fbDownload() {
     "Date", "Branch", "Room", "Room category",
     ...RATING_FIELDS.map((f) => f.label),
     "NPS", "Collected via", "Comment", "Guest name", "Guest contact", "Served by",
-    "Status", "Resolved on", "Resolution note",
+    "Status", "Resolved on", "Resolution note", "Entered on",
   ];
   const rows = [header];
   fb.rows.forEach((r) => {
     const room = lookups.roomMap[r.room_id];
     rows.push([
-      loStamp(r.created_at),
+      fbSourceOf(r) === "paper" ? loStamp(r.created_at).slice(0, 10) : loStamp(r.created_at),
       csvText(lookups.branchMap[r.branch_id] || ""),
       csvText(room ? room.room_number : ""),
       csvText(lookups.catNameMap[lookups.roomCatMap[r.room_id]] || ""),
@@ -442,6 +451,7 @@ function fbDownload() {
       isResolved(r) ? "Resolved" : getBadTriggers(r).length ? "Needs attention" : "Good",
       loStamp(r.resolved_at),
       csvText(r.resolved_note),
+      loStamp(r.entered_at),
     ]);
   });
   const today = new Date().toISOString().slice(0, 10);

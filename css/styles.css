@@ -1567,3 +1567,103 @@ input[type="range"] {
 #print-report .report-tag.good {
   background: var(--success);
 }
+
+/* ---- Paper feedback entry (temporary) ---- */
+
+.paper-card {
+  max-width: 720px;
+  padding: 24px;
+}
+
+.paper-card input[type="date"] {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  color: var(--text-dark);
+  font: inherit;
+  margin-bottom: 20px;
+}
+
+.paper-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.paper-optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.paper-rating-row,
+.paper-sum-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+}
+
+.paper-rating-row .stars {
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.paper-sum-row strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+#paper-ratings + .rating-hint {
+  margin: 6px 0 16px;
+}
+
+#paper-saved {
+  margin: 0 0 16px;
+}
+
+#paper-review-msg {
+  margin-bottom: 14px;
+}
+
+.paper-chips {
+  gap: 6px;
+}
+
+.paper-chips .chip {
+  padding: 8px 13px;
+}
+
+.paper-staff {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0 14px;
+}
+
+.paper-staff .checkbox-item {
+  padding: 6px 0;
+  margin: 0;
+  border-bottom: none;
+}
+
+#paper-mentions {
+  margin-bottom: 18px;
+}
+
+.paper-retry {
+  background: none;
+  border: none;
+  color: var(--terracotta-dark);
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .paper-grid {
+    grid-template-columns: 1fr;
+  }
+}

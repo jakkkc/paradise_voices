@@ -98,6 +98,7 @@ async function handlePinComplete() {
 
   await loadRoomsForBranch(state.branchId, state.branchCode);
   showView("view-room");
+  refreshPaperButton(); // paper-entry.js; not awaited so it never delays the guest flow
 }
 
 function naturalRoomSort(a, b) {
@@ -151,6 +152,8 @@ function fullReset() {
   state.referralSource = null;
   state.selectedMentions = new Set();
   resetPin();
+  resetPaperForm(false);
+  refreshPaperButton(); // no PIN now, so this hides it
   showView("view-pin");
 }
 

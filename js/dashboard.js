@@ -1021,7 +1021,59 @@ function renderStaffList(staffRows) {
   });
 }
 
+// ---------- Paper feedback entry switch (temporary) ----------
+
+function paperToggleMsg(text, kind) {
+  const el = document.getElementById("paper-toggle-msg");
+  el.textContent = text;
+  el.className = "status-line " + kind;
+  el.style.display = text ? "block" : "none";
+}
+
+// `enabled` is true, false, or null when it isn't known.
+function renderPaperToggle(enabled) {
+  const btn = document.getElementById("paper-toggle-btn");
+  document.getElementById("paper-toggle-state").textContent = enabled === null ? "Unknown" : enabled ? "On" : "Off";
+  btn.textContent = enabled ? "Switch off" : "Switch on";
+  btn.className = "btn " + (enabled ? "btn-secondary" : "btn-primary");
+  btn.dataset.enabled = enabled ? "1" : "";
+  btn.disabled = enabled === null;
+}
+
+function paperToggleError(error) {
+  return /could not find the function/i.test(error.message || "")
+    ? "The paper entry database setup hasn't been run in Supabase yet."
+    : "Couldn't reach the paper entry setting: " + (error.message || "try again.");
+}
+
+async function loadPaperToggle() {
+  paperToggleMsg("", "");
+  renderPaperToggle(null);
+  const { data, error } = await db.rpc("paper_entry_status", { input_pin: mgmtState.pin });
+  if (error) return paperToggleMsg(paperToggleError(error), "error");
+  renderPaperToggle(data === true);
+}
+
+async function togglePaperEntry() {
+  const btn = document.getElementById("paper-toggle-btn");
+  const wanted = btn.dataset.enabled !== "1";
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  const { data, error } = await db.rpc("set_paper_entry_enabled", {
+    input_mgmt_pin: mgmtState.pin,
+    input_enabled: wanted,
+  });
+  if (error) {
+    renderPaperToggle(!wanted);
+    paperToggleMsg(paperToggleError(error), "error");
+    return;
+  }
+  renderPaperToggle(data === true);
+  paperToggleMsg(data === true ? "Switched on ✓ Reception sees it the next time they enter their PIN." : "Switched off ✓", "ok");
+}
+
 async function openStaffView() {
+  loadPaperToggle();
   const rows = await loadStaffRoles();
   renderStaffList(rows);
   await refreshTeamMembersUI();
@@ -1498,6 +1550,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.location.reload();
   });
   document.getElementById("staff-settings-btn").addEventListener("click", openStaffView);
+  document.getElementById("paper-toggle-btn").addEventListener("click", togglePaperEntry);
   document.getElementById("staff-back-btn").addEventListener("click", () => showView("view-dashboard"));
   document.getElementById("download-report-btn").addEventListener("click", generateAndPrintReport);
 

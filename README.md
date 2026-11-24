@@ -18,6 +18,7 @@ js/supabase-client.js            Supabase connection
 js/app.js                        PIN login, room choice, guest feedback wizard
 js/guest-mode.js                 QR guest mode (?b=HPC&room=K5), no PIN
 js/loyalty-reception.js          Loyalty desk for reception (find, enrol, award, redeem)
+js/paper-entry.js                One-page paper form entry for reception (temporary)
 js/dashboard.js                  Analytics, staff settings, downloadable report
 js/dashboard-feedback.js         "Feedback" page: filters, resolve / reopen, CSV
 js/dashboard-qr.js               QR code sheet (A6, four per A4)
@@ -40,3 +41,8 @@ also works for a quick look, but the service worker and "Add to Home Screen" nee
 ## Database changes
 Run only the block you need from `sql/schema.sql` in the Supabase SQL Editor. Running the whole file on an
 existing project fails at the first `create table`.
+
+## Paper feedback entry (temporary)
+1. Run the "Paper feedback entry" block at the end of `sql/schema.sql` in Supabase, then deploy.
+2. Management switches it on in Staff Settings. Reception then gets an "Enter Paper Form" button after their PIN.
+3. When paper is no longer used, switch it off. Saved paper responses stay in the reports.

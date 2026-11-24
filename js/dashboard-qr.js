@@ -8,6 +8,7 @@ const SOURCE_LABELS = {
   tablet: "Reception tablet",
   room_qr: "Room QR code",
   reception_qr: "Reception QR code",
+  paper: "Paper form",
 };
 
 function renderSourceBreakdown(rows) {
@@ -19,7 +20,7 @@ function renderSourceBreakdown(rows) {
     return;
   }
 
-  const counts = { tablet: 0, room_qr: 0, reception_qr: 0 };
+  const counts = { tablet: 0, room_qr: 0, reception_qr: 0, paper: 0 };
   rows.forEach((r) => {
     const key = r.source in counts ? r.source : "tablet"; // older responses have no source: they were tablet
     counts[key]++;
