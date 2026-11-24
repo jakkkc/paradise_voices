@@ -517,6 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ---------- Resolve / reopen (used by the Analytics lists and this page) ----------
 
 function afterResolveChange() {
+  clearTimeout(settleTimer); // everything is redrawn right now
   updateAttention();
   renderCommentGroups(periodFilteredRows());
   if (fbEl("view-feedback").classList.contains("active")) fbRender();
@@ -538,7 +539,7 @@ function openResolveForm(btn) {
     <input type="text" class="resolve-note-input" maxlength="300" placeholder="e.g. Called the guest and offered a discount" />
     <div class="status-line error resolve-error" style="display:none; margin-top:6px;"></div>
     <div class="resolve-form-actions">
-      <button type="button" class="btn btn-primary resolve-save" style="width:auto; padding:8px 16px;">Save</button>
+      <button type="button" class="btn btn-primary resolve-save" style="width:auto; padding:8px 16px;">Resolve</button>
       <button type="button" class="btn-link resolve-cancel" style="width:auto;">Cancel</button>
     </div>`;
   card.appendChild(form);
@@ -557,8 +558,9 @@ async function saveResolve(form) {
   }
 
   const saveBtn = form.querySelector(".resolve-save");
+  if (saveBtn.disabled) return; // Enter pressed again while saving
   saveBtn.disabled = true;
-  saveBtn.textContent = "Saving…";
+  saveBtn.textContent = "Resolving…";
 
   const { error } = await db.rpc("resolve_feedback", {
     input_mgmt_pin: mgmtState.pin,
@@ -568,7 +570,7 @@ async function saveResolve(form) {
 
   if (error) {
     saveBtn.disabled = false;
-    saveBtn.textContent = "Save";
+    saveBtn.textContent = "Resolve";
     errorEl.textContent = resolveRpcError(error);
     errorEl.style.display = "block";
     return;
@@ -578,8 +580,57 @@ async function saveResolve(form) {
   if (row) {
     row.resolved_at = new Date().toISOString();
     row.resolved_note = note;
+    showResolved(form.closest(".feedback-card"), row);
   }
-  afterResolveChange();
+  updateAttention();
+  settleLists(RESOLVED_HOLD_MS);
+}
+
+// ---------- Open -> Resolved animation ----------
+// The card changes in place first, so the new status is seen, and the lists
+// are redrawn a moment later.
+
+const RESOLVED_HOLD_MS = 1200;
+const RESOLVED_LEAVE_MS = 250;
+let settleTimer = null;
+
+function showResolved(card, row) {
+  card.querySelector(".resolve-form").remove();
+  card.querySelector(".resolve-row").outerHTML = resolveControlsHtml(row);
+  card.classList.remove("bad");
+  card.classList.add("resolved", "just-resolved");
+  card.dataset.rowId = row.id;
+}
+
+// A list is left alone while a note is being written in it, then redrawn.
+function listIsBusy(viewId) {
+  return !!document.querySelector(`#${viewId} .resolve-form`);
+}
+
+function settleLists(delay) {
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => {
+    const keep = new Set(fbFiltered().map((r) => r.id));
+    const leaving = [...document.querySelectorAll(".just-resolved")].filter((card) =>
+      card.closest("#view-dashboard")
+        ? !listIsBusy("view-dashboard")
+        : !listIsBusy("view-feedback") && !keep.has(card.dataset.rowId)
+    );
+    leaving.forEach((card) => card.classList.add("leaving"));
+    settleTimer = setTimeout(redrawSettledLists, leaving.length ? RESOLVED_LEAVE_MS : 0);
+  }, delay);
+}
+
+function redrawSettledLists() {
+  const onFeedback = fbEl("view-feedback").classList.contains("active");
+  const dashBusy = listIsBusy("view-dashboard");
+  const fbBusy = onFeedback && listIsBusy("view-feedback");
+  if (!dashBusy) renderCommentGroups(periodFilteredRows());
+  if (onFeedback && !fbBusy) fbRender();
+  if (dashBusy || fbBusy) {
+    document.querySelectorAll(".leaving").forEach((card) => card.classList.remove("leaving"));
+    settleLists(500);
+  }
 }
 
 async function reopenFeedback(btn) {

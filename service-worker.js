@@ -4,7 +4,7 @@
 // tablets getting stuck with a stale mix of old/new files after updates —
 // which is what caused the intermittent "works sometimes" bugs.
 
-const CACHE_NAME = "paradise-voices-v6";
+const CACHE_NAME = "paradise-voices-v7";
 
 const PRECACHE_URLS = [
   "index.html",

@@ -1879,3 +1879,54 @@ input[type="range"] {
     padding: 8px;
   }
 }
+
+/* ---- Resolved status ---- */
+
+.feedback-card,
+.feedback-card-header {
+  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+}
+
+.resolved-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  margin-right: 4px;
+  border-radius: 999px;
+  background: var(--success);
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.just-resolved .resolved-pill {
+  animation: resolved-pop 0.3s ease-out;
+}
+
+.feedback-card.leaving {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+@keyframes resolved-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedback-card,
+  .feedback-card-header,
+  .feedback-card.leaving {
+    transition: none;
+    transform: none;
+  }
+
+  .just-resolved .resolved-pill {
+    animation: none;
+  }
+}

@@ -891,21 +891,21 @@ function isResolved(row) {
   return !!row.resolved_at;
 }
 
-// The "Resolved" button on open items, or the note + "Reopen" on resolved ones.
+// The "Resolve" button on open items, or the status, note + "Reopen" on resolved ones.
 // Both are handled by the click handler in dashboard-feedback.js.
 function resolveControlsHtml(row) {
   if (isResolved(row)) {
     const when = new Date(row.resolved_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
     return `
       <div class="resolve-row">
-        <div class="resolved-note"><strong>Resolved ${escHtml(when)}:</strong> ${escHtml(row.resolved_note || "")}</div>
+        <div class="resolved-note"><span class="resolved-pill">✓ Resolved</span> <strong>${escHtml(when)}:</strong> ${escHtml(row.resolved_note || "")}</div>
         <button type="button" class="btn-resolve btn-reopen" data-reopen-id="${escHtml(row.id)}">Reopen</button>
       </div>`;
   }
   if (getBadTriggers(row).length > 0) {
     return `
       <div class="resolve-row">
-        <button type="button" class="btn-resolve" data-resolve-id="${escHtml(row.id)}">Resolved</button>
+        <button type="button" class="btn-resolve" data-resolve-id="${escHtml(row.id)}">Resolve</button>
       </div>`;
   }
   return "";
